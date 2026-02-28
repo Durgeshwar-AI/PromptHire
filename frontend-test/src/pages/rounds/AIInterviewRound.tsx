@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
+import { startRound, completeRound } from "../../services/pipeline";
 
 const CANDIDATE = {
   name: "Arjun Mehta",
@@ -28,6 +29,9 @@ export function AIInterviewRound() {
   const [ended, setEnded] = useState(false);
   const [transcript, setTranscript] = useState<{ role: string; text: string }[]>([]);
   const chatRef = useRef<HTMLDivElement>(null);
+
+  /* mark pipeline */
+  useEffect(() => { startRound("ai-interview"); }, []);
 
   /* timer */
   useEffect(() => {
@@ -141,7 +145,7 @@ export function AIInterviewRound() {
             <Btn variant="secondary" onClick={() => navigate("/candidate-profile")}>
               Back to Profile
             </Btn>
-            <Btn onClick={() => navigate("/round/technical-interview")}>
+            <Btn onClick={() => { completeRound("ai-interview"); navigate("/round/technical-interview"); }}>
               Next Round →
             </Btn>
           </div>

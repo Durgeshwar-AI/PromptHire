@@ -1,13 +1,10 @@
 import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "../../assets/components/shared/Card";
 import { Btn } from "../../assets/components/shared/Btn";
 import { Tag, StatusPill } from "../../assets/components/shared/Badges";
 
-interface NavigateProps {
-  onNavigate?: (target: string) => void;
-}
-
-const JOB = {
+const DEFAULTS = {
   title: "Senior Backend Engineer",
   company: "TechCorp Inc.",
   round: "AI Voice Interview",
@@ -25,14 +22,28 @@ const JOB = {
   ],
 };
 
-export function InterviewEntryPage({ onNavigate }: NavigateProps) {
+export function InterviewEntryPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const jobId = searchParams.get("jobId") || "";
+  const jobTitle = searchParams.get("jobTitle") || DEFAULTS.title;
   const [micOk, setMicOk] = useState(false);
+
+  const handleStart = () => {
+    const params = new URLSearchParams();
+    if (jobId) params.set("jobId", jobId);
+    const qs = params.toString();
+    navigate(`/round/ai-interview${qs ? `?${qs}` : ""}`);
+  };
 
   return (
     <div className="min-h-screen bg-tertiary">
       {/* Minimal nav */}
       <nav className="flex items-center justify-between px-10 h-[60px] bg-secondary border-b-2 border-secondary">
-        <div className="font-display font-black text-xl text-white">
+        <div
+          className="font-display font-black text-xl text-white cursor-pointer"
+          onClick={() => navigate("/candidate-profile")}
+        >
           HR<span className="text-primary">11</span>
           <span className="bg-primary text-white text-[8px] px-1.5 py-px ml-1.5 tracking-[0.1em]">
             AI
@@ -65,15 +76,15 @@ export function InterviewEntryPage({ onNavigate }: NavigateProps) {
               <div className="p-6">
                 <div className="border-l-4 border-primary pl-3.5 mb-5">
                   <div className="font-display font-black text-[22px] uppercase text-secondary mb-1">
-                    {JOB.title}
+                    {jobTitle}
                   </div>
                   <div className="font-body text-[13px] text-ink-light">
-                    {JOB.company}
+                    {DEFAULTS.company}
                   </div>
                 </div>
 
                 <div className="flex gap-2.5 mb-4 flex-wrap">
-                  {JOB.skills.map((s) => (
+                  {DEFAULTS.skills.map((s) => (
                     <Tag key={s}>{s}</Tag>
                   ))}
                 </div>
@@ -82,10 +93,10 @@ export function InterviewEntryPage({ onNavigate }: NavigateProps) {
                 <div className="bg-surface-alt border border-border-clr p-3 px-3.5">
                   <div className="flex justify-between items-center mb-2">
                     <span className="font-display font-extrabold text-xs tracking-[0.15em] uppercase text-secondary">
-                      Round {JOB.roundNum} of {JOB.totalRounds}
+                      Round {DEFAULTS.roundNum} of {DEFAULTS.totalRounds}
                     </span>
                     <span className="font-display font-black text-sm text-primary">
-                      {JOB.round}
+                      {DEFAULTS.round}
                     </span>
                   </div>
                   {/* Progress bar */}
@@ -93,7 +104,7 @@ export function InterviewEntryPage({ onNavigate }: NavigateProps) {
                     <div
                       className="h-full bg-primary transition-[width] duration-500"
                       style={{
-                        width: `${(JOB.roundNum / JOB.totalRounds) * 100}%`,
+                        width: `${(DEFAULTS.roundNum / DEFAULTS.totalRounds) * 100}%`,
                       }}
                     />
                   </div>
@@ -108,8 +119,8 @@ export function InterviewEntryPage({ onNavigate }: NavigateProps) {
                   Session Details
                 </div>
                 {[
-                  { icon: "⏱", label: "Duration", val: JOB.duration },
-                  { icon: "🤖", label: "Interviewer", val: JOB.interviewer },
+                  { icon: "⏱", label: "Duration", val: DEFAULTS.duration },
+                  { icon: "🤖", label: "Interviewer", val: DEFAULTS.interviewer },
                   {
                     icon: "🎙️",
                     label: "Format",
@@ -150,7 +161,7 @@ export function InterviewEntryPage({ onNavigate }: NavigateProps) {
                   Before You Start
                 </div>
                 <div className="flex flex-col gap-2">
-                  {JOB.notes.map((n, i) => (
+                  {DEFAULTS.notes.map((n, i) => (
                     <div key={i} className="flex gap-2.5 items-start">
                       <div className="w-[18px] h-[18px] bg-primary shrink-0 mt-px flex items-center justify-center font-display font-black text-[9px] text-white">
                         {i + 1}
@@ -200,7 +211,7 @@ export function InterviewEntryPage({ onNavigate }: NavigateProps) {
             {/* Start button */}
             <Btn
               fullWidth
-              onClick={() => onNavigate?.("interview")}
+              onClick={handleStart}
               disabled={!micOk}
               style={{ padding: "18px", fontSize: 16 }}
             >

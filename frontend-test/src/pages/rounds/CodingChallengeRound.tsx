@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
 import { codingApi, getStoredUser } from "../../services/api";
+import { startRound, completeRound } from "../../services/pipeline";
 
 type CodingProblem = {
   _id?: string;
@@ -128,6 +129,9 @@ export function CodingChallengeRound() {
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
   const [finishing, setFinishing] = useState(false);
 
+  /* mark pipeline */
+  useEffect(() => { startRound("coding"); }, []);
+
   /* Fetch problem from backend, fallback to mock */
   useEffect(() => {
     let cancelled = false;
@@ -223,7 +227,11 @@ export function CodingChallengeRound() {
       await codingApi.finish({ jobId, candidateId });
     } catch { /* proceed anyway */ }
     setFinishing(false);
-    navigate("/round/ai-interview");
+    completeRound("coding");
+    const params = new URLSearchParams();
+    if (jobId) params.set("jobId", jobId);
+    const qs = params.toString();
+    navigate(`/interview-entry${qs ? `?${qs}` : ""}`);
   };
 
   return (

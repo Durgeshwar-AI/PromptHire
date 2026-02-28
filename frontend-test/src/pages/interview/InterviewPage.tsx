@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
 
 type Role = "ai" | "candidate";
@@ -6,10 +7,6 @@ type Role = "ai" | "candidate";
 interface Message {
   role: Role;
   text: string;
-}
-
-interface NavigateProps {
-  onNavigate?: (target: string) => void;
 }
 
 const TRANSCRIPT: Message[] = [
@@ -56,7 +53,8 @@ function VoiceWave({ active }: { active: boolean }) {
   );
 }
 
-export function InterviewPage({ onNavigate }: NavigateProps) {
+export function InterviewPage() {
+  const navigate = useNavigate();
   const [elapsed, setElapsed] = useState(0);
   const [aiTalking, setAiTalking] = useState(true);
   const [userTalking, setUserTalking] = useState(false);
@@ -97,7 +95,7 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  if (showReport) return <ReportView onNavigate={onNavigate} />;
+  if (showReport) return <ReportView />;
 
   return (
     <div className="min-h-screen bg-secondary flex flex-col">
@@ -269,7 +267,8 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
 }
 
 /* ─── Post-Interview Report ─── */
-function ReportView({ onNavigate }: NavigateProps) {
+function ReportView() {
+  const navigate = useNavigate();
   const scores = [
     { label: "Technical Depth", score: 88 },
     { label: "Communication Clarity", score: 82 },
@@ -364,11 +363,11 @@ function ReportView({ onNavigate }: NavigateProps) {
         <div className="mt-6 flex gap-3 justify-center">
           <Btn
             variant="secondary"
-            onClick={() => onNavigate?.("candidate-profile")}
+            onClick={() => navigate("/candidate-profile")}
           >
             Back to Profile
           </Btn>
-          <Btn onClick={() => onNavigate?.("interview-entry")}>
+          <Btn onClick={() => navigate("/candidate-profile")}>
             View Full Report
           </Btn>
         </div>

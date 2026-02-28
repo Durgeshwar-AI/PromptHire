@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStoredUser, clearAuth, isLoggedIn } from "../../services/api";
+import { loadPipeline, getDefaultPipeline, type PipelineRound } from "../../services/pipeline";
 import { Card, SectionLabel, Divider } from "../../assets/components/shared/Card";
 import { Btn } from "../../assets/components/shared/Btn";
 import { Tag } from "../../assets/components/shared/Badges";
@@ -60,6 +61,29 @@ export function CandidateProfile() {
   const handleResume = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) setResumeFile(file);
+  };
+
+  /* Pipeline progress (persisted in localStorage) */
+  const [pipeline, setPipeline] = useState<PipelineRound[]>(loadPipeline);
+  const hasApplication = pipeline.some((r) => r.status !== "locked");
+
+  /* Determine the "continue" round — the first non-completed round */
+  const currentRound = pipeline.find((r) => r.status === "current");
+  const nextLockedIdx = pipeline.findIndex((r) => r.status === "locked");
+  const allDone = pipeline.every((r) => r.status === "completed");
+
+  /* Start a new application — marks round 1 as current */
+  const startApplication = () => {
+    const fresh = getDefaultPipeline();
+    fresh[0].status = "current";
+    localStorage.setItem("hr11_pipeline_progress", JSON.stringify(fresh));
+    setPipeline(fresh);
+    navigate(fresh[0].path);
+  };
+
+  /* Continue to the current round */
+  const continueApplication = () => {
+    if (currentRound) navigate(currentRound.path);
   };
 
   /* Sign out */
@@ -199,8 +223,142 @@ export function CandidateProfile() {
             </Card>
           </div>
 
-          {/* ── Right Column: Resume + Actions ─────────────── */}
+          {/* ── Right Column: Pipeline + Resume + Actions ── */}
           <div className="flex flex-col gap-4">
+            {/* ── Application Pipeline ──────────────────────── */}
+            <Card>
+              <div className="bg-secondary px-5 py-3">
+                <span className="font-display font-extrabold text-xs text-white tracking-[0.15em] uppercase">
+                  My Application Pipeline
+                </span>
+              </div>
+              <div className="p-5">
+                {!hasApplication ? (
+                  <div className="text-center py-6">
+                    <div className="text-[40px] mb-3">🚀</div>
+                    <div className="font-display font-extrabold text-sm uppercase text-secondary mb-1">
+                      No Active Application
+                    </div>
+                    <p className="font-body text-xs text-ink-faint mb-4">
+                      Browse openings and apply to start your pipeline.
+                    </p>
+                    <Btn size="sm" onClick={() => navigate("/recent-openings")}>
+                      Browse Openings →
+                    </Btn>
+                  </div>
+                ) : (
+                  <>
+                    {/* Round list */}
+                    <div className="flex flex-col gap-0.5">
+                      {pipeline.map((round, idx) => {
+                        const isCompleted = round.status === "completed";
+                        const isCurrent = round.status === "current";
+                        const isLocked = round.status === "locked";
+                        return (
+                          <div key={round.key}>
+                            <div
+                              onClick={() => {
+                                if (isCurrent) navigate(round.path);
+                                else if (isCompleted) navigate(round.path);
+                              }}
+                              className={[
+                                "flex items-center gap-3 px-3 py-2.5 border-2 transition-all",
+                                isCurrent
+                                  ? "border-primary bg-primary/[0.06] cursor-pointer"
+                                  : isCompleted
+                                    ? "border-[#1A8917]/30 bg-[#f0fdf0] cursor-pointer"
+                                    : "border-border-clr bg-surface-alt opacity-50 cursor-not-allowed",
+                              ].join(" ")}
+                            >
+                              {/* Step number */}
+                              <div
+                                className={[
+                                  "w-7 h-7 flex items-center justify-center shrink-0 font-display font-black text-xs border-2",
+                                  isCompleted
+                                    ? "bg-[#1A8917] border-[#1A8917] text-white"
+                                    : isCurrent
+                                      ? "bg-primary border-primary text-white"
+                                      : "bg-surface border-secondary text-ink-faint",
+                                ].join(" ")}
+                              >
+                                {isCompleted ? "✓" : idx + 1}
+                              </div>
+
+                              {/* Icon + label */}
+                              <span className="text-base shrink-0">{round.icon}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className={[
+                                  "font-display font-extrabold text-xs uppercase tracking-[0.05em]",
+                                  isCompleted ? "text-[#1A8917]" : isCurrent ? "text-primary" : "text-ink-faint",
+                                ].join(" ")}>
+                                  {round.label}
+                                </div>
+                                <div className="text-[10px] font-body text-ink-faint">
+                                  {isCompleted ? "Completed" : isCurrent ? "In progress — tap to continue" : "Locked"}
+                                </div>
+                              </div>
+
+                              {/* Arrow for current */}
+                              {isCurrent && (
+                                <span className="text-primary font-display font-black text-sm">→</span>
+                              )}
+                            </div>
+
+                            {/* Connector line */}
+                            {idx < pipeline.length - 1 && (
+                              <div className="flex justify-start pl-[22px]">
+                                <div className={[
+                                  "w-0.5 h-3",
+                                  isCompleted ? "bg-[#1A8917]" : "bg-border-clr",
+                                ].join(" ")} />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="mt-4">
+                      <div className="flex justify-between text-[10px] font-display font-bold uppercase tracking-[0.1em] text-ink-faint mb-1">
+                        <span>Progress</span>
+                        <span>{pipeline.filter((r) => r.status === "completed").length}/{pipeline.length} rounds</span>
+                      </div>
+                      <div className="h-2 bg-surface-alt border border-border-clr">
+                        <div
+                          className={[
+                            "h-full transition-all duration-500",
+                            allDone ? "bg-[#1A8917]" : "bg-primary",
+                          ].join(" ")}
+                          style={{
+                            width: `${(pipeline.filter((r) => r.status === "completed").length / pipeline.length) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* CTA */}
+                    <div className="mt-4">
+                      {allDone ? (
+                        <div className="border-2 border-[#1A8917] bg-[#f0fdf0] p-4 text-center">
+                          <div className="font-display font-black text-base uppercase text-[#1A8917] mb-1">
+                            🎉 All Rounds Complete!
+                          </div>
+                          <p className="font-body text-xs text-ink-light">
+                            Your results are being reviewed. You'll hear back soon.
+                          </p>
+                        </div>
+                      ) : currentRound ? (
+                        <Btn fullWidth onClick={continueApplication}>
+                          Continue: {currentRound.label} →
+                        </Btn>
+                      ) : null}
+                    </div>
+                  </>
+                )}
+              </div>
+            </Card>
+
             {/* Resume Section */}
             <Card>
               <div className="bg-secondary px-5 py-3">
@@ -266,13 +424,11 @@ export function CandidateProfile() {
                 <Btn fullWidth onClick={() => navigate("/recent-openings")}>
                   Browse Recent Openings →
                 </Btn>
-                <Btn
-                  fullWidth
-                  variant="secondary"
-                  onClick={() => navigate("/interview-entry")}
-                >
-                  My Applications
-                </Btn>
+                {hasApplication && currentRound && (
+                  <Btn fullWidth variant="secondary" onClick={continueApplication}>
+                    Continue Application →
+                  </Btn>
+                )}
               </div>
             </Card>
           </div>
