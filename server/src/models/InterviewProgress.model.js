@@ -4,10 +4,13 @@ const roundSchema = new mongoose.Schema(
   {
     roundNumber: { type: Number, required: true },
     roundName: { type: String },
+    stageType: { type: String, default: null }, // e.g. "aptitude_test", "technical_interview"
+    scheduledDate: { type: Date, default: null }, // auto-filled by scheduler
     score: { type: Number, default: null },
+    passed: { type: Boolean, default: null }, // null = not yet decided
     status: {
       type: String,
-      enum: ["Pending", "InProgress", "Completed"],
+      enum: ["Pending", "InProgress", "Completed", "Skipped"],
       default: "Pending",
     },
     updatedAt: { type: Date, default: null },

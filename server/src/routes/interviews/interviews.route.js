@@ -2,10 +2,10 @@ import express from "express";
 import { authenticateHR } from "../../middleware/auth.js";
 import Interview from "../../models/Interview.model.js";
 import JobRole from "../../models/JobRole.model.js";
+import InterviewProgress from "../../models/InterviewProgress.model.js";
 import { callGeminiStandard } from "../../services/geminiService.js";
-import {
-  buildRankingPrompt,
-} from "../../services/promptTemplates.js";
+import { processFailedCandidates } from "../../services/pipelineScheduler.service.js";
+import { buildRankingPrompt } from "../../services/promptTemplates.js";
 
 const router = express.Router();
 
@@ -69,7 +69,11 @@ router.get("/job/:jobId/leaderboard", authenticateHR, async (req, res) => {
         }));
 
       return res.json({
-        ranking: { leaderboard: sorted, doNotProceed: [], recommendedTopCandidate: sorted[0]?.candidateId },
+        ranking: {
+          leaderboard: sorted,
+          doNotProceed: [],
+          recommendedTopCandidate: sorted[0]?.candidateId,
+        },
         raw: interviews,
       });
     }
@@ -81,6 +85,63 @@ router.get("/job/:jobId/leaderboard", authenticateHR, async (req, res) => {
     res.json({ ranking, raw: interviews });
   } catch (err) {
     console.error("Leaderboard error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Pipeline progress — all candidates for a job ─────────────────
+router.get(
+  "/job/:jobId/pipeline-progress",
+  authenticateHR,
+  async (req, res) => {
+    try {
+      const progress = await InterviewProgress.find({ jobId: req.params.jobId })
+        .sort({ rank: 1 })
+        .lean();
+
+      const job = await JobRole.findById(req.params.jobId).select(
+        "title pipeline totalRounds schedulingDone",
+      );
+
+      res.json({ progress, pipeline: job?.pipeline ?? [], job });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+// ─── Single candidate pipeline progress ──────────────────────────
+router.get(
+  "/progress/:candidateId/job/:jobId",
+  authenticateHR,
+  async (req, res) => {
+    try {
+      const progress = await InterviewProgress.findOne({
+        candidateId: req.params.candidateId,
+        jobId: req.params.jobId,
+      });
+      if (!progress)
+        return res.status(404).json({ error: "Progress record not found" });
+      res.json(progress);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+// ─── Manually trigger shortlisting for a pipeline stage ──────────
+router.post("/job/:jobId/shortlist-stage", authenticateHR, async (req, res) => {
+  try {
+    const { roundNumber } = req.body;
+    if (!roundNumber)
+      return res.status(400).json({ error: "roundNumber is required" });
+
+    const result = await processFailedCandidates(
+      req.params.jobId,
+      Number(roundNumber),
+    );
+    res.json({ message: "Shortlisting complete", ...result });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

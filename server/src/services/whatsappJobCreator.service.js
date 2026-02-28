@@ -21,6 +21,14 @@ Parse the message and return ONLY valid JSON (no markdown, no extra text) with t
   "submissionDeadline": "ISO 8601 date string or null if not mentioned",
   "topN": number or null (how many top candidates to keep),
   "totalRounds": number or null (total interview rounds after screening),
+  "pipeline": [
+    {
+      "stageType": "one of: resume_screening | aptitude_test | coding_challenge | ai_voice_interview | technical_interview | custom_round",
+      "order": 1,
+      "thresholdScore": 60,
+      "daysAfterPrev": 3
+    }
+  ],
   "questions": [
     {
       "text": "question text",
@@ -30,11 +38,20 @@ Parse the message and return ONLY valid JSON (no markdown, no extra text) with t
   ]
 }
 
-Rules:
+Pipeline rules:
+- "pipeline" should be inferred when the HR mentions stage names like "aptitude", "coding", "technical", "resume screening", "AI interview", "voice interview".
+- Stages allowed: resume_screening, aptitude_test, coding_challenge, ai_voice_interview, technical_interview, custom_round.
+- A stage can repeat (e.g. two technical rounds). Assign sequential order values.
+- If no pipeline is mentioned, return "pipeline" as an empty array.
+- "thresholdScore" defaults to 60 unless explicitly stated.
+- "daysAfterPrev" defaults to 3 unless a gap is explicitly stated.
+
+General rules:
 - If a deadline date is mentioned without a year, assume the current year (2026).
-- If "rounds" or "stages" are mentioned, put the count in totalRounds.
+- If "rounds" or "stages" are mentioned by count only (not names), put the count in totalRounds and leave pipeline empty.
+- If pipeline stages are named, populate the pipeline array AND set totalRounds to the pipeline length.
 - If no questions are explicitly mentioned, return questions as an empty array.
-- Skills can be inferred from the job title if not explicitly listed (e.g. "React Engineer" → ["React", "JavaScript"]).
+- Skills can be inferred from the job title if not explicitly listed.
 - Always return valid JSON. Never include code fences or explanation text.`;
 
 /**
@@ -83,19 +100,39 @@ export async function parseJobFromMessage(message) {
  * createdByHRId must be a valid HRUser ObjectId.
  */
 export async function createJobFromParsed(parsed, createdByHRId) {
+  // Normalise pipeline stages if the AI returned them
+  const pipeline = Array.isArray(parsed.pipeline)
+    ? parsed.pipeline
+        .filter((s) => s.stageType)
+        .map((s, idx) => ({
+          stageType: s.stageType,
+          stageName: s.stageName || null,
+          order: s.order ?? idx + 1,
+          thresholdScore: s.thresholdScore ?? 60,
+          daysAfterPrev: s.daysAfterPrev ?? 3,
+          scheduledDate: null,
+        }))
+    : [];
+
+  const computedTotalRounds =
+    pipeline.length > 0
+      ? pipeline.length
+      : parsed.totalRounds != null
+        ? Number(parsed.totalRounds)
+        : 2;
+
   const job = await JobRole.create({
     title: parsed.title,
     description: parsed.description || "",
     skills: Array.isArray(parsed.skills) ? parsed.skills : [],
     createdBy: createdByHRId,
     status: "Active",
+    pipeline,
+    totalRounds: computedTotalRounds,
     ...(parsed.submissionDeadline && {
       submissionDeadline: new Date(parsed.submissionDeadline),
     }),
     ...(parsed.topN != null && { topN: Number(parsed.topN) }),
-    ...(parsed.totalRounds != null && {
-      totalRounds: Number(parsed.totalRounds),
-    }),
   });
 
   const questions = Array.isArray(parsed.questions) ? parsed.questions : [];
@@ -144,6 +181,13 @@ export async function handleWhatsAppJobCommand(message, createdByHRId) {
       ? questions.map((q, i) => `  ${i + 1}. [${q.level}] ${q.text}`).join("\n")
       : "  None added";
 
+  const pipelineLines =
+    job.pipeline?.length > 0
+      ? job.pipeline
+          .map((s) => `  ${s.order}. ${s.stageType.replace(/_/g, " ")}`)
+          .join("\n")
+      : "  Not defined (use ADD PIPELINE)";
+
   const summary =
     `✅ *Job Created Successfully!*\n\n` +
     `*Title:* ${job.title}\n` +
@@ -151,6 +195,7 @@ export async function handleWhatsAppJobCommand(message, createdByHRId) {
     `*Deadline:* ${deadline}\n` +
     `*Top N candidates:* ${job.topN}\n` +
     `*Interview Rounds:* ${job.totalRounds}\n` +
+    `*Pipeline (${job.pipeline?.length ?? 0} stages):*\n${pipelineLines}\n` +
     `*Questions (${questions.length}):*\n${questionLines}\n\n` +
     `*Job ID:* ${job._id}`;
 

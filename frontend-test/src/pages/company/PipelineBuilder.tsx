@@ -77,20 +77,14 @@ export function PipelineBuilder() {
   const flowRef = useRef<HTMLDivElement>(null);
   const drag = useDragSort(setPipeline);
 
-  // count per round id so we can show "Added (N)" badge
-  const roundCounts = pipeline.reduce<Record<string, number>>(
-    (acc, r) => ({ ...acc, [r.id]: (acc[r.id] ?? 0) + 1 }),
-    {},
-  );
-
   const addRound = (r: PipelineRound) => {
+    // Repeats ARE allowed — just push another copy
     setPipeline((p) => [...p, r]);
     setTimeout(
       () => flowRef.current?.scrollTo({ top: 9999, behavior: "smooth" }),
       80,
     );
   };
-  // remove by position so duplicates work correctly
   const removeRound = (idx: number) =>
     setPipeline((p) => p.filter((_, i) => i !== idx));
   const canDeploy = !!jobTitle.trim() && pipeline.length > 0 && !loading;
@@ -101,9 +95,16 @@ export function PipelineBuilder() {
     try {
       await jobsApi.create({
         title: jobTitle.trim(),
-        description: `Pipeline with ${pipeline.length} rounds`,
+        description: `Hiring pipeline: ${pipeline.map((r) => r.label).join(" → ")}`,
         totalRounds: pipeline.length,
-        pipeline: pipeline.map((r, i) => ({ index: i + 1, roundName: r.label })),
+        // Send full pipeline with stageType so backend can save it
+        pipeline: pipeline.map((r, i) => ({
+          stageType: r.id, // ROUNDS[].id === stageType
+          stageName: r.label,
+          order: i + 1,
+          thresholdScore: 60,
+          daysAfterPrev: 3,
+        })),
       });
       setDeployed(true);
     } catch (err: unknown) {
@@ -169,7 +170,7 @@ export function PipelineBuilder() {
             <SectionLabel>Available Rounds ({ROUNDS.length})</SectionLabel>
             <div className="flex flex-col gap-[7px]">
               {ROUNDS.map((r) => {
-                const count = roundCounts[r.id] ?? 0;
+                const count = pipeline.filter((p) => p.id === r.id).length;
                 return (
                   <button
                     key={r.id}
@@ -183,7 +184,7 @@ export function PipelineBuilder() {
                       </span>
                       {count > 0 && (
                         <span className="text-[10px] text-primary ml-2 font-body">
-                          ✓ Added{count > 1 ? ` ×${count}` : ""}
+                          ×{count} added
                         </span>
                       )}
                       <div className="text-[10px] text-ink-faint font-body mt-px">
@@ -241,7 +242,7 @@ export function PipelineBuilder() {
                 const isOver = drag.overIdx === i && drag.dragIdx !== i;
                 return (
                   <div
-                    key={i}
+                    key={`${round.id}-${i}`}
                     className="w-full flex flex-col items-center"
                   >
                     <Connector />
@@ -347,12 +348,14 @@ export function PipelineBuilder() {
           <pre className="p-5 font-mono text-[11px] leading-[1.75] overflow-auto max-h-[400px] text-ink-light bg-surface-alt">
             {JSON.stringify(
               {
-                job_title: jobTitle || "Untitled",
-                created_at: new Date().toISOString(),
-                total_rounds: pipeline.length,
+                title: jobTitle || "Untitled",
+                totalRounds: pipeline.length,
                 pipeline: pipeline.map((r, i) => ({
-                  index: i + 1,
-                  roundName: r.label,
+                  stageType: r.id,
+                  stageName: r.label,
+                  order: i + 1,
+                  thresholdScore: 60,
+                  daysAfterPrev: 3,
                 })),
               },
               null,

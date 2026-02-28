@@ -1,8 +1,9 @@
 import cron from "node-cron";
 import JobRole from "../models/JobRole.model.js";
 import ScreeningCandidate from "../models/candidate.screening.model.js";
-import { sendRejectionEmail } from "./mail.services.js";
+import { sendRejectionEmail, sendShortlistEmail } from "./mail.services.js";
 import { upsertInterviewProgressRecords } from "./interviewProgress.service.js";
+import { autoSchedulePipeline } from "./pipelineScheduler.service.js";
 
 /**
  * Process a single job that has passed its submission deadline:
@@ -89,6 +90,28 @@ async function processJobAutoReject(job) {
     );
 
     await upsertInterviewProgressRecords(job, keptWithRank);
+
+    // Send shortlist notification emails
+    await Promise.allSettled(
+      keptWithRank.map((c) =>
+        c.email
+          ? sendShortlistEmail(c.email, c.name, jobTitle, c._rank)
+          : Promise.resolve(),
+      ),
+    );
+
+    // Auto-schedule pipeline stages if not already done
+    if (job.pipeline?.length > 0 && !job.schedulingDone) {
+      try {
+        await autoSchedulePipeline(job, job.submissionDeadline);
+        console.log(`[AutoReject] jobId=${jobId} — pipeline auto-scheduled`);
+      } catch (schedErr) {
+        console.warn(
+          `[AutoReject] Pipeline scheduling failed for jobId=${jobId}:`,
+          schedErr.message,
+        );
+      }
+    }
   }
 
   // ── Reject & email the rest ────────────────────────────────────
