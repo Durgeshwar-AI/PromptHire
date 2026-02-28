@@ -1,16 +1,12 @@
 import { config } from "dotenv";
 import app from "./app.js";
 import connectDB from "./config/db.js";
-import { initEvaluationQueue } from "./workers/evaluationQueue.js";
 
 config();
 
 const PORT = process.env.PORT || 5000;
 
-connectDB().then(async () => {
-  // Initialise BullMQ evaluation queue (no-op if Redis unavailable)
-  await initEvaluationQueue();
-
+connectDB().then(() => {
   app.listen(PORT, () => console.log(`AgenticHire server running on port ${PORT}`));
 });
 

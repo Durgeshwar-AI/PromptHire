@@ -1,9 +1,19 @@
 import express from "express";
-import upload from "../../config/multer.js";
+import { upload } from "../../config/cloudinary.js";
 import { screenResume } from "../../services/aiService.services.js";
 import Candidate from "../../models/candidate.screening.model.js";
 
 const router = express.Router();
+
+// Wrap multer middleware so its errors are caught by our route handler
+function runUpload(req, res) {
+  return new Promise((resolve, reject) => {
+    upload.single("resume")(req, res, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
 
 router.post("/:id/screen", async (req, res) => {
   try {
@@ -32,13 +42,16 @@ router.post("/:id/screen", async (req, res) => {
       screening: result,
     });
   } catch (err) {
-    console.error("Screen candidate error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("[submit-and-screen] Error:", err);
+    const message = err?.message || err?.toString() || "Unknown error";
+    res.status(500).json({ error: message });
   }
 });
 
-router.post("/submit-and-screen", upload.single("resume"), async (req, res) => {
+router.post("/submit-and-screen", async (req, res) => {
   try {
+    await runUpload(req, res);
+
     if (!req.file) {
       return res.status(400).json({ error: "Resume file is required" });
     }
