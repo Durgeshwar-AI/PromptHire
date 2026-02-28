@@ -25,7 +25,7 @@ router.post("/token", authenticateCandidate, async (req, res) => {
       const interview = await Interview.findOneAndUpdate(
         { candidateId, jobId, status: "Scheduled" },
         { status: "InProgress", livekitRoomId },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
+        { new: true, upsert: true, setDefaultsOnInsert: true },
       );
       interviewId = interview._id;
     }
@@ -45,7 +45,7 @@ router.post("/token", authenticateCandidate, async (req, res) => {
             interviewId,
             mode,
           }),
-        }
+        },
       );
       at.addGrant({
         roomJoin: true,
@@ -59,7 +59,7 @@ router.post("/token", authenticateCandidate, async (req, res) => {
       // LiveKit SDK not installed — return a placeholder for dev
       token = `dev-placeholder-token-${interview._id}`;
       console.warn(
-        "livekit-server-sdk not installed — returning placeholder token"
+        "livekit-server-sdk not installed — returning placeholder token",
       );
     }
 

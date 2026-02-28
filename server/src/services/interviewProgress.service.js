@@ -114,7 +114,9 @@ async function updateRoundScore({
       return normalized;
     }
 
-    const pendingIndex = rounds.findIndex((round) => round.status !== "Completed");
+    const pendingIndex = rounds.findIndex(
+      (round) => round.status !== "Completed",
+    );
     if (pendingIndex >= 0) return pendingIndex;
 
     rounds.push({

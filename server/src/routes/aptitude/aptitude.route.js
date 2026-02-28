@@ -17,12 +17,7 @@ const DIFFICULTY_WEIGHT = {
 
 router.get("/questions", authenticateAgent, async (req, res) => {
   try {
-    const {
-      limit = 5,
-      difficulty,
-      category,
-      jobId,
-    } = req.query;
+    const { limit = 5, difficulty, category, jobId } = req.query;
 
     const parsedLimit = Math.max(1, Math.min(Number(limit) || 5, 50));
 
