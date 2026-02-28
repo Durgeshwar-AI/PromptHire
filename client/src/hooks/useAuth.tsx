@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, type ReactNode } from "react";
 
 interface User {
@@ -17,18 +18,33 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+const NO_AUTH_MODE = import.meta.env.VITE_DISABLE_AUTH !== "false";
+const LOCAL_TEST_USER: User = {
+  id: "local-user",
+  name: "Local Tester",
+  email: "local@test.dev",
+  role: "admin",
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() =>
-    localStorage.getItem("token")
-  );
+  const [token, setToken] = useState<string | null>(() => {
+    const storedToken = localStorage.getItem("token");
+    if (storedToken) return storedToken;
+    return NO_AUTH_MODE ? "local-dev-token" : null;
+  });
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem("user");
-    return stored ? JSON.parse(stored) : null;
+    if (stored) return JSON.parse(stored);
+    return NO_AUTH_MODE ? LOCAL_TEST_USER : null;
   });
-  const [userType, setUserType] = useState<"candidate" | "hr" | null>(() =>
-    localStorage.getItem("userType") as "candidate" | "hr" | null
-  );
+  const [userType, setUserType] = useState<"candidate" | "hr" | null>(() => {
+    const storedType = localStorage.getItem("userType") as
+      | "candidate"
+      | "hr"
+      | null;
+    if (storedType) return storedType;
+    return NO_AUTH_MODE ? "hr" : null;
+  });
 
   const login = (token: string, user: User, type: "candidate" | "hr") => {
     setToken(token);
@@ -40,6 +56,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    if (NO_AUTH_MODE) {
+      setToken("local-dev-token");
+      setUser(LOCAL_TEST_USER);
+      setUserType("hr");
+      localStorage.setItem("token", "local-dev-token");
+      localStorage.setItem("user", JSON.stringify(LOCAL_TEST_USER));
+      localStorage.setItem("userType", "hr");
+      return;
+    }
+
     setToken(null);
     setUser(null);
     setUserType(null);
@@ -50,7 +76,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ token, user, userType, login, logout, isAuthenticated: !!token }}
+      value={{
+        token,
+        user: user || (NO_AUTH_MODE ? LOCAL_TEST_USER : null),
+        userType,
+        login,
+        logout,
+        isAuthenticated: NO_AUTH_MODE ? true : !!token,
+      }}
     >
       {children}
     </AuthContext.Provider>
