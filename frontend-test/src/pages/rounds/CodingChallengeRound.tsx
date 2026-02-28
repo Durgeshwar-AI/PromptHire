@@ -334,27 +334,14 @@ export function CodingChallengeRound() {
             </div>
           </div>
 
-          {/* Code textarea (mock editor) */}
+          {/* Code textarea (Notepad-style) */}
           <div className="flex-1 overflow-hidden flex flex-col">
-            <div className="flex-1 relative">
-              {/* Line numbers */}
-              <div className="absolute left-0 top-0 bottom-0 w-[48px] bg-[#1e1e1e] border-r border-[#333] overflow-hidden pointer-events-none z-10">
-                <div className="pt-4 pl-3">
-                  {code.split("\n").map((_, i) => (
-                    <div
-                      key={i}
-                      className="text-[13px] leading-[22px] font-mono text-[#555] select-none"
-                    >
-                      {i + 1}
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="flex-1">
               <textarea
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 spellCheck={false}
-                className="w-full h-full bg-[#1e1e1e] text-[#d4d4d4] font-mono text-[13px] leading-[22px] p-4 pl-[56px] outline-none resize-none border-none"
+                className="w-full h-full bg-white text-secondary font-mono text-sm leading-relaxed p-4 outline-none resize-none border-none"
                 style={{ tabSize: 4 }}
               />
             </div>

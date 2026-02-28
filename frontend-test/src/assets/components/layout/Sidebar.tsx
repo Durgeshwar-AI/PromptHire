@@ -34,7 +34,7 @@ export function Sidebar({ currentPage, collapsed }: any) {
           return (
             <div
               key={item.key}
-              onClick={() => navigate(item.path)}}
+              onClick={() => navigate(item.path)}
               className={[
                 "flex items-center gap-3 cursor-pointer text-lg transition-all duration-150",
                 collapsed ? "py-3 px-4" : "py-3 px-5",

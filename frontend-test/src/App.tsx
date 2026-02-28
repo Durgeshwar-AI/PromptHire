@@ -46,6 +46,7 @@ export default function App() {
         <Route path="/company-login" element={<CompanyLogin />} />
         <Route path="/company-register" element={<CompanyRegister />} />
         <Route path="/candidate-login" element={<CandidateLogin />} />
+        <Route path="/candidate-register" element={<CandidateRegister />} />
         {/* App pages */}
         <Route path="/dashboard" element={<CompanyDashboard />} />
         <Route path="/leaderboard" element={<HiringLeaderboard />} />
