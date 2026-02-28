@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
 import { Input } from "../../assets/components/shared/Input";
+import { authApi, saveAuth } from "../../services/api";
 
 function AuthShell({ title, subtitle, tag, children, footer }: any) {
   return (
@@ -82,9 +84,26 @@ export function OrDivider() {
 }
 
 /* ─── Company Login ─── */
-export function CompanyLogin({ onNavigate }: any) {
+export function CompanyLogin() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await authApi.hrLogin({ email, password: pass });
+      saveAuth(res.token, res.user);
+      navigate("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <AuthShell
       tag="Company / HR Portal"
@@ -94,7 +113,7 @@ export function CompanyLogin({ onNavigate }: any) {
         <>
           Don't have an account?{" "}
           <span
-            onClick={() => onNavigate("register-company")}
+            onClick={() => navigate("/company-register")}
             className="text-primary cursor-pointer font-semibold"
           >
             Register your company
@@ -124,14 +143,19 @@ export function CompanyLogin({ onNavigate }: any) {
             Forgot password?
           </span>
         </div>
-        <Btn fullWidth onClick={() => onNavigate("dashboard")}>
-          Sign In →
+        {error && (
+          <div className="text-xs text-red-600 font-body bg-red-50 border border-red-200 px-3 py-2">
+            {error}
+          </div>
+        )}
+        <Btn fullWidth onClick={handleLogin} disabled={loading}>
+          {loading ? "Signing in…" : "Sign In →"}
         </Btn>
         <OrDivider />
         <Btn
           fullWidth
           variant="secondary"
-          onClick={() => onNavigate("dashboard")}
+          onClick={() => navigate("/dashboard")}
         >
           🔗 Continue with Google
         </Btn>
@@ -141,15 +165,32 @@ export function CompanyLogin({ onNavigate }: any) {
 }
 
 /* ─── Company Register ─── */
-export function CompanyRegister({ onNavigate }: any) {
+export function CompanyRegister() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     company: "",
     name: "",
     email: "",
     pass: "",
   });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const set = (k: string) => (e: any) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const handleRegister = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await authApi.hrRegister({ name: form.name, email: form.email, password: form.pass, company: form.company });
+      saveAuth(res.token, res.user);
+      navigate("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Registration failed");
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <AuthShell
       tag="Company / HR Portal"
@@ -159,7 +200,7 @@ export function CompanyRegister({ onNavigate }: any) {
         <>
           Already have an account?{" "}
           <span
-            onClick={() => onNavigate("login-company")}
+            onClick={() => navigate("/company-login")}
             className="text-primary cursor-pointer font-semibold"
           >
             Sign in
@@ -201,13 +242,18 @@ export function CompanyRegister({ onNavigate }: any) {
         <p className="text-[11px] text-ink-faint font-body leading-snug">
           By registering you agree to our Terms of Service and Privacy Policy.
         </p>
-        <Btn fullWidth onClick={() => onNavigate("dashboard")}>
-          Create Company Account →
+        {error && (
+          <div className="text-xs text-red-600 font-body bg-red-50 border border-red-200 px-3 py-2">
+            {error}
+          </div>
+        )}
+        <Btn fullWidth onClick={handleRegister} disabled={loading}>
+          {loading ? "Creating account…" : "Create Company Account →"}
         </Btn>
         <Btn
           fullWidth
           variant="secondary"
-          onClick={() => onNavigate("dashboard")}
+          onClick={() => navigate("/dashboard")}
         >
           🔗 Register with Google
         </Btn>
@@ -217,9 +263,26 @@ export function CompanyRegister({ onNavigate }: any) {
 }
 
 /* ─── Candidate Login ─── */
-export function CandidateLogin({ onNavigate }: any) {
+export function CandidateLogin() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await authApi.candidateLogin({ email, password: pass });
+      saveAuth(res.token, res.user);
+      navigate("/candidate-profile");
+    } catch (err: any) {
+      setError(err.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <AuthShell
       tag="Job Applicant Portal"
@@ -229,7 +292,7 @@ export function CandidateLogin({ onNavigate }: any) {
         <>
           New here?{" "}
           <span
-            onClick={() => onNavigate("register-candidate")}
+            onClick={() => navigate("/candidate-register")}
             className="text-primary cursor-pointer font-semibold"
           >
             Create a free account
@@ -254,8 +317,8 @@ export function CandidateLogin({ onNavigate }: any) {
           onChange={(e: any) => setPass(e.target.value)}
           required
         />
-        <Btn fullWidth onClick={() => onNavigate("candidate-profile")}>
-          Sign In →
+        <Btn fullWidth onClick={handleLogin} disabled={loading}>
+          {loading ? "Signing in…" : "Sign In →"}
         </Btn>
         <OrDivider />
         <Btn fullWidth variant="secondary">
@@ -264,16 +327,38 @@ export function CandidateLogin({ onNavigate }: any) {
         <Btn fullWidth variant="secondary">
           💼 Continue with LinkedIn
         </Btn>
+        {error && (
+          <div className="text-xs text-red-600 font-body bg-red-50 border border-red-200 px-3 py-2">
+            {error}
+          </div>
+        )}
       </div>
     </AuthShell>
   );
 }
 
 /* ─── Candidate Register ─── */
-export function CandidateRegister({ onNavigate }: any) {
+export function CandidateRegister() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", pass: "", role: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const set = (k: string) => (e: any) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const handleRegister = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await authApi.candidateRegister({ name: form.name, email: form.email, password: form.pass, role: form.role });
+      saveAuth(res.token, res.user);
+      navigate("/candidate-profile");
+    } catch (err: any) {
+      setError(err.message || "Registration failed");
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <AuthShell
       tag="Job Applicant Portal"
@@ -283,7 +368,7 @@ export function CandidateRegister({ onNavigate }: any) {
         <>
           Already have an account?{" "}
           <span
-            onClick={() => onNavigate("login-candidate")}
+            onClick={() => navigate("/candidate-login")}
             className="text-primary cursor-pointer font-semibold"
           >
             Sign in
@@ -321,9 +406,14 @@ export function CandidateRegister({ onNavigate }: any) {
           onChange={set("pass")}
           required
         />
-        <Btn fullWidth onClick={() => onNavigate("candidate-profile")}>
-          Create My Account →
+        <Btn fullWidth onClick={handleRegister} disabled={loading}>
+          {loading ? "Creating account…" : "Create My Account →"}
         </Btn>
+        {error && (
+          <div className="text-xs text-red-600 font-body bg-red-50 border border-red-200 px-3 py-2">
+            {error}
+          </div>
+        )}
         <Btn fullWidth variant="secondary">
           🔗 Sign Up with Google
         </Btn>

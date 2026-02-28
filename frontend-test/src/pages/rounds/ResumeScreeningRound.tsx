@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
 import { Card } from "../../assets/components/shared/Card";
+import { resumeApi, getStoredUser } from "../../services/api";
 
 /* ── mock resume data pulled from "profile" ── */
 const PROFILE_RESUME = {
@@ -18,10 +19,14 @@ type Result = { selected: boolean; score: number; summary: string; strengths: st
 
 export function ResumeScreeningRound() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const candidateId = searchParams.get("candidateId") || getStoredUser()?._id || "";
+  const jobTitle = searchParams.get("jobTitle") || PROFILE_RESUME.role;
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<Result>(null);
+  const [useApi, setUseApi] = useState(!!candidateId);
 
-  /* auto-submit on mount after a short delay */
+  /* auto-submit on mount */
   useEffect(() => {
     const t = setTimeout(() => {
       setPhase("submitting");
@@ -29,12 +34,37 @@ export function ResumeScreeningRound() {
     return () => clearTimeout(t);
   }, []);
 
+  /* Try backend screening, else use mock animation */
   useEffect(() => {
     if (phase === "submitting") {
+      if (useApi && candidateId) {
+        setPhase("analysing");
+        (async () => {
+          try {
+            const data = await resumeApi.screenExisting(candidateId, {
+              jobTitle,
+              jobDescription: `Screening for ${jobTitle}`,
+            });
+            const s = data.screening || data;
+            setResult({
+              selected: (s.score ?? s.overallScore ?? 80) >= 60,
+              score: s.score ?? s.overallScore ?? 80,
+              summary: s.summary ?? s.analysis ?? "AI analysis complete.",
+              strengths: s.strengths ?? s.pros ?? ["Relevant experience", "Strong skills"],
+              weaknesses: s.weaknesses ?? s.cons ?? ["See detailed report"],
+            });
+            setPhase("done");
+          } catch {
+            setUseApi(false);
+            setPhase("submitting");
+          }
+        })();
+        return;
+      }
       const t = setTimeout(() => setPhase("analysing"), 1400);
       return () => clearTimeout(t);
     }
-    if (phase === "analysing") {
+    if (phase === "analysing" && !useApi) {
       const t = setTimeout(() => {
         setResult({
           selected: true,
@@ -56,7 +86,7 @@ export function ResumeScreeningRound() {
       }, 2200);
       return () => clearTimeout(t);
     }
-  }, [phase]);
+  }, [phase, useApi, candidateId, jobTitle]);
 
   /* ── progress bar helper ── */
   const progressPct =

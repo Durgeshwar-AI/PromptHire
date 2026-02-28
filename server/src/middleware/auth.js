@@ -1,6 +1,9 @@
 import jwt from "jsonwebtoken";
 
-const NO_AUTH_MODE = process.env.DISABLE_AUTH !== "false";
+/** Read at call-time so dotenv has already loaded */
+function isNoAuthMode() {
+  return process.env.DISABLE_AUTH !== "false";
+}
 
 /**
  * Authenticate a candidate via JWT.
@@ -8,7 +11,7 @@ const NO_AUTH_MODE = process.env.DISABLE_AUTH !== "false";
  * Sets req.candidate = { id, email }
  */
 export function authenticateCandidate(req, res, next) {
-  if (NO_AUTH_MODE) {
+  if (isNoAuthMode()) {
     req.candidate = { id: "000000000000000000000002", email: "local-candidate@test.dev" };
     return next();
   }
@@ -39,7 +42,7 @@ export function authenticateCandidate(req, res, next) {
  * Sets req.hrUser = { id, email, role }
  */
 export function authenticateHR(req, res, next) {
-  if (NO_AUTH_MODE) {
+  if (isNoAuthMode()) {
     // Use a fixed valid ObjectId placeholder so model refs don't fail
     req.hrUser = { id: "000000000000000000000001", email: "local-hr@test.dev", role: "admin" };
     return next();
@@ -70,7 +73,7 @@ export function authenticateHR(req, res, next) {
  * Expects: x-agent-api-key header
  */
 export function authenticateAgent(req, res, next) {
-  if (NO_AUTH_MODE) {
+  if (isNoAuthMode()) {
     return next();
   }
 

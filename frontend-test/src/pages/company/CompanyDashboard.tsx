@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "../../assets/components/layout/AppShell";
 import { StatBox } from "../../assets/components/shared/StatBox";
@@ -14,6 +15,7 @@ import {
   MOCK_OPENINGS,
   MOCK_CANDIDATES,
 } from "../../constants/data";
+import { jobsApi } from "../../services/api";
 
 function ActivityFeed() {
   const items = [
@@ -125,6 +127,40 @@ function OpeningCard({ opening }: any) {
 
 export function CompanyDashboard() {
   const navigate = useNavigate();
+  const [openings, setOpenings] = useState<any[]>(MOCK_OPENINGS);
+  const [stats, setStats] = useState(MOCK_STATS);
+
+  /* Try fetching real jobs from backend, fallback to mock */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const jobs = await jobsApi.list();
+        if (!cancelled && Array.isArray(jobs) && jobs.length) {
+          setOpenings(
+            jobs.map((j: any) => ({
+              id: j._id,
+              title: j.title,
+              department: j.description || "Engineering",
+              applicants: j.applicantCount ?? 0,
+              shortlisted: j.shortlistedCount ?? 0,
+              status: j.status || "active",
+              posted: j.createdAt ? new Date(j.createdAt).toLocaleDateString() : "—",
+              pipeline: j.pipeline || ["resume_screening"],
+            })),
+          );
+          setStats((prev) => ({
+            ...prev,
+            activeOpenings: jobs.filter((j: any) => j.status === "active" || !j.status).length,
+            totalApplicants: jobs.reduce((sum: number, j: any) => sum + (j.applicantCount ?? 0), 0),
+          }));
+        }
+      } catch {
+        /* keep mock data */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   return (
     <AppShell currentPage="dashboard">
       {/* Page header */}
@@ -146,28 +182,28 @@ export function CompanyDashboard() {
       <div className="fade-up grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 mb-7">
         <StatBox
           label="Total Applicants"
-          value={MOCK_STATS.totalApplicants}
+          value={stats.totalApplicants}
           sub="Across all openings"
           accent
         />
         <StatBox
           label="Active Openings"
-          value={MOCK_STATS.activeOpenings}
+          value={stats.activeOpenings}
           sub="3 closing soon"
         />
         <StatBox
           label="Shortlisted"
-          value={MOCK_STATS.shortlisted}
+          value={stats.shortlisted}
           sub="Ready for review"
         />
         <StatBox
           label="Hired This Month"
-          value={MOCK_STATS.hiredThisMonth}
+          value={stats.hiredThisMonth}
           sub="↑ 2 vs last month"
         />
         <StatBox
           label="Avg Time to Hire"
-          value={MOCK_STATS.avgTimeToHire}
+          value={stats.avgTimeToHire}
           sub="Industry avg: 28d"
         />
       </div>
@@ -178,7 +214,7 @@ export function CompanyDashboard() {
         <div>
           <SectionLabel>Active Job Openings</SectionLabel>
           <div className="flex flex-col gap-3">
-            {MOCK_OPENINGS.map((o: any) => (
+            {openings.map((o: any) => (
               <OpeningCard key={o.id} opening={o} />
             ))}
           </div>

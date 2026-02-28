@@ -1,10 +1,8 @@
-import { config } from "dotenv";
+import "dotenv/config";              // must be FIRST — before any other import
 import app from "./app.js";
 import connectDB from "./config/db.js";
 import { initEvaluationQueue } from "./workers/evaluationQueue.js";
 import { startAutoRejectScheduler } from "./services/autoReject.services.js";
-
-config();
 
 const PORT = process.env.PORT || 5000;
 

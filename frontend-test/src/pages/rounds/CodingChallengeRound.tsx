@@ -1,9 +1,10 @@
-import { useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
+import { codingApi, getStoredUser } from "../../services/api";
 
-/* ── Mock problem ── */
-const PROBLEM = {
+/* ── Fallback mock problem ── */
+const MOCK_PROBLEM = {
   title: "Two Sum",
   difficulty: "Medium",
   tags: ["Array", "Hash Table"],
@@ -64,15 +65,51 @@ const MOCK_RESULTS = {
 
 export function CodingChallengeRound() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const jobId = searchParams.get("jobId") || "";
+  const candidateId = searchParams.get("candidateId") || getStoredUser()?._id || "";
+
+  const [problem, setProblem] = useState<any>(MOCK_PROBLEM);
+  const [loading, setLoading] = useState(true);
   const [code, setCode] = useState(DEFAULT_CODE);
   const [lang, setLang] = useState("JavaScript");
-  const [leftWidth, setLeftWidth] = useState(45); // percent
+  const [leftWidth, setLeftWidth] = useState(45);
   const [tab, setTab] = useState<"description" | "submissions">("description");
   const [outputTab, setOutputTab] = useState<"testcase" | "result">("testcase");
   const [submitted, setSubmitted] = useState(false);
   const [running, setRunning] = useState(false);
   const [showOutput, setShowOutput] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(120 * 60); // 2 hours
+  const [timeLeft, setTimeLeft] = useState(120 * 60);
+  const [submitResult, setSubmitResult] = useState<any>(null);
+  const [finishing, setFinishing] = useState(false);
+
+  /* Fetch problem from backend, fallback to mock */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await codingApi.getQuestions({ limit: 1, jobId: jobId || undefined });
+        if (!cancelled && data.questions?.length) {
+          const q = data.questions[0];
+          setProblem({
+            _id: q._id,
+            title: q.title,
+            difficulty: q.difficulty || "Medium",
+            tags: q.tags || [],
+            description: q.description,
+            examples: q.examples || MOCK_PROBLEM.examples,
+            constraints: q.constraints || MOCK_PROBLEM.constraints,
+          });
+          if (q.starterCode) setCode(q.starterCode);
+        }
+      } catch {
+        /* keep mock */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [jobId]);
 
   /* timer */
   useState(() => {
@@ -122,9 +159,25 @@ export function CodingChallengeRound() {
     setRunning(true);
     setShowOutput(true);
     setOutputTab("result");
-    await new Promise((r) => setTimeout(r, 2000));
-    setRunning(false);
-    setSubmitted(true);
+    try {
+      const questionId = problem._id || "mock";
+      const data = await codingApi.submit({ jobId, candidateId, questionId, language: lang, code });
+      setSubmitResult(data);
+    } catch {
+      setSubmitResult(MOCK_RESULTS);
+    } finally {
+      setRunning(false);
+      setSubmitted(true);
+    }
+  };
+
+  const handleFinish = async () => {
+    setFinishing(true);
+    try {
+      await codingApi.finish({ jobId, candidateId });
+    } catch { /* proceed anyway */ }
+    setFinishing(false);
+    navigate("/round/ai-interview");
   };
 
   return (
@@ -149,8 +202,8 @@ export function CodingChallengeRound() {
             </span>
           </div>
           {submitted && (
-            <Btn size="sm" onClick={() => navigate("/round/ai-interview")}>
-              Next Round →
+            <Btn size="sm" onClick={handleFinish} disabled={finishing}>
+              {finishing ? "Finishing…" : "Next Round →"}
             </Btn>
           )}
         </div>
@@ -186,24 +239,24 @@ export function CodingChallengeRound() {
               {/* Title */}
               <div className="flex items-center gap-3 mb-4">
                 <h1 className="font-display font-black text-2xl text-secondary">
-                  {PROBLEM.title}
+                  {problem.title}
                 </h1>
                 <span
                   className={`text-[10px] font-display font-extrabold tracking-[0.1em] uppercase px-2 py-0.5 border-2 ${
-                    PROBLEM.difficulty === "Easy"
+                    problem.difficulty === "Easy"
                       ? "border-[#1A8917] text-[#1A8917]"
-                      : PROBLEM.difficulty === "Medium"
+                      : problem.difficulty === "Medium"
                         ? "border-yellow-600 text-yellow-600"
                         : "border-red-600 text-red-600"
                   }`}
                 >
-                  {PROBLEM.difficulty}
+                  {problem.difficulty}
                 </span>
               </div>
 
               {/* Tags */}
               <div className="flex gap-2 mb-6">
-                {PROBLEM.tags.map((t) => (
+                {problem.tags.map((t) => (
                   <span
                     key={t}
                     className="text-[10px] font-body font-semibold bg-surface-alt border border-border-clr px-2 py-0.5 text-ink-faint"
@@ -215,11 +268,11 @@ export function CodingChallengeRound() {
 
               {/* Description */}
               <div className="font-body text-sm text-secondary leading-relaxed mb-6 whitespace-pre-line">
-                {PROBLEM.description}
+                {problem.description}
               </div>
 
               {/* Examples */}
-              {PROBLEM.examples.map((ex, i) => (
+              {problem.examples.map((ex, i) => (
                 <div key={i} className="mb-5">
                   <div className="font-display font-bold text-xs text-secondary mb-1.5">
                     Example {i + 1}:
@@ -249,7 +302,7 @@ export function CodingChallengeRound() {
                   Constraints:
                 </div>
                 <ul className="list-none pl-0">
-                  {PROBLEM.constraints.map((c, i) => (
+                  {problem.constraints.map((c, i) => (
                     <li
                       key={i}
                       className="font-mono text-xs text-ink-light mb-1 flex gap-2"
@@ -264,23 +317,25 @@ export function CodingChallengeRound() {
 
           {tab === "submissions" && (
             <div className="p-6 flex-1">
-              {submitted ? (
+              {submitted && submitResult ? (
                 <div>
-                  <div className={`border-2 p-5 mb-4 ${MOCK_RESULTS.passed >= 40 ? "border-[#1A8917] bg-[#f0fdf0]" : "border-[#c00] bg-[#fff5f5]"}`}>
+                  <div className={`border-2 p-5 mb-4 ${(submitResult.submission?.testCasesPassed ?? MOCK_RESULTS.passed) >= (submitResult.submission?.totalTestCases ?? MOCK_RESULTS.total) * 0.8 ? "border-[#1A8917] bg-[#f0fdf0]" : "border-[#c00] bg-[#fff5f5]"}`}>
                     <div className="font-display font-black text-lg text-secondary mb-1">
-                      {MOCK_RESULTS.passed >= 40 ? "✅ Accepted" : "❌ Wrong Answer"}
+                      {(submitResult.submission?.testCasesPassed ?? MOCK_RESULTS.passed) >= (submitResult.submission?.totalTestCases ?? MOCK_RESULTS.total) * 0.8 ? "✅ Accepted" : "❌ Wrong Answer"}
                     </div>
                     <div className="font-body text-xs text-ink-light">
-                      {MOCK_RESULTS.passed}/{MOCK_RESULTS.total} test cases passed · Runtime: {MOCK_RESULTS.runtime} · Memory: {MOCK_RESULTS.memory}
+                      {submitResult.submission?.testCasesPassed ?? MOCK_RESULTS.passed}/{submitResult.submission?.totalTestCases ?? MOCK_RESULTS.total} test cases passed
+                      {submitResult.submission?.runtime ? ` · Runtime: ${submitResult.submission.runtime}` : ` · Runtime: ${MOCK_RESULTS.runtime}`}
+                      {submitResult.submission?.memory ? ` · Memory: ${submitResult.submission.memory}` : ` · Memory: ${MOCK_RESULTS.memory}`}
                     </div>
                   </div>
-                  {MOCK_RESULTS.passed >= 40 && (
+                  {(submitResult.submission?.testCasesPassed ?? MOCK_RESULTS.passed) >= (submitResult.submission?.totalTestCases ?? MOCK_RESULTS.total) * 0.8 && (
                     <div className="border-2 border-[#1A8917] bg-[#f0fdf0] p-4 text-center">
                       <div className="font-display font-extrabold text-sm uppercase text-[#1A8917] mb-2">
                         Selected for next round!
                       </div>
-                      <Btn size="sm" onClick={() => navigate("/round/ai-interview")}>
-                        Proceed to AI Interview →
+                      <Btn size="sm" onClick={handleFinish} disabled={finishing}>
+                        {finishing ? "Finishing…" : "Proceed to AI Interview →"}
                       </Btn>
                     </div>
                   )}

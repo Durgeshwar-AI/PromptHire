@@ -1,14 +1,17 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppShell } from "../../assets/components/layout/AppShell";
 import { Card } from "../../assets/components/shared/Card";
 import { Btn } from "../../assets/components/shared/Btn";
 import { Input } from "../../assets/components/shared/Input";
+import { resumeApi } from "../../services/api";
 
 // A simple page where HR can upload a resume and supply a job title/description
 // The form hits the `/api/candidates/submit-and-screen` endpoint and displays
 // the returned screening result.
 
-export function ResumeScreening({ onNavigate }: any) {
+export function ResumeScreening() {
+  const navigate = useNavigate();
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jobTitle, setJobTitle] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -36,13 +39,7 @@ export function ResumeScreening({ onNavigate }: any) {
       form.append("jobTitle", jobTitle);
       form.append("jobDescription", jobDescription);
 
-      const resp = await fetch("/api/candidates/submit-and-screen", {
-        method: "POST",
-        body: form,
-      });
-
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "Unknown error");
+      const data = await resumeApi.submitAndScreen(form);
       setScreening(data.screening);
     } catch (err: any) {
       console.error("screening error", err);
@@ -53,7 +50,7 @@ export function ResumeScreening({ onNavigate }: any) {
   };
 
   return (
-    <AppShell currentPage="resume-screening" onNavigate={onNavigate}>
+    <AppShell currentPage="resume-screening">
       <div className="max-w-[640px] mx-auto">
         <div className="fade-up mb-7">
           <p className="font-body text-xs tracking-[0.15em] uppercase text-primary mb-1">

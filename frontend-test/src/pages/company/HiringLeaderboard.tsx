@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "../../assets/components/layout/AppShell";
 import { Card, SectionLabel } from "../../assets/components/shared/Card";
@@ -10,6 +10,7 @@ import {
 import { Avatar } from "../../assets/components/shared/Avatar";
 import { Btn } from "../../assets/components/shared/Btn";
 import { MOCK_OPENINGS, MOCK_CANDIDATES } from "../../constants/data";
+import { jobsApi, interviewsApi } from "../../services/api";
 
 function CandidateRow({ candidate, rank, onViewInterview }: any) {
   const medals: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
@@ -91,9 +92,67 @@ function CandidateRow({ candidate, rank, onViewInterview }: any) {
 
 export function HiringLeaderboard() {
   const navigate = useNavigate();
-  const [selectedOpening, setSelectedOpening] = useState(MOCK_OPENINGS[0]);
+  const [openings, setOpenings] = useState<any[]>(MOCK_OPENINGS);
+  const [selectedOpening, setSelectedOpening] = useState<any>(MOCK_OPENINGS[0]);
+  const [candidates, setCandidates] = useState<any[]>(MOCK_CANDIDATES);
 
-  const sorted = [...MOCK_CANDIDATES].sort(
+  /* Fetch real job openings */
+  useEffect(() => {
+    (async () => {
+      try {
+        const jobs = await jobsApi.list();
+        if (Array.isArray(jobs) && jobs.length) {
+          const mapped = jobs.map((j: any) => ({
+            id: j._id,
+            title: j.title,
+            department: j.description || "Engineering",
+            applicants: j.applicantCount ?? 0,
+            shortlisted: j.shortlistedCount ?? 0,
+            status: j.status || "active",
+            posted: j.createdAt ? new Date(j.createdAt).toLocaleDateString() : "—",
+            pipeline: j.pipeline || ["resume_screening"],
+          }));
+          setOpenings(mapped);
+          setSelectedOpening(mapped[0]);
+        }
+      } catch { /* keep mock */ }
+    })();
+  }, []);
+
+  /* Fetch leaderboard when selectedOpening changes */
+  useEffect(() => {
+    if (!selectedOpening?.id) return;
+    (async () => {
+      try {
+        const data = await interviewsApi.leaderboard(selectedOpening.id);
+        if (Array.isArray(data) && data.length) {
+          setCandidates(
+            data.map((c: any, i: number) => ({
+              id: c._id || c.candidateId || i,
+              name: c.candidateName || c.name || `Candidate ${i + 1}`,
+              score: c.totalScore ?? c.score ?? 0,
+              status: c.status || "in_progress",
+              round: c.currentRound || "Resume Screening",
+              avatar: (c.candidateName || c.name || "??")
+                .split(" ")
+                .map((w: string) => w[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase(),
+              skills: c.skills || [],
+              appliedDate: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "",
+            })),
+          );
+        } else {
+          setCandidates(MOCK_CANDIDATES);
+        }
+      } catch {
+        setCandidates(MOCK_CANDIDATES);
+      }
+    })();
+  }, [selectedOpening]);
+
+  const sorted = [...candidates].sort(
     (a: any, b: any) => b.score - a.score,
   );
 
@@ -120,7 +179,7 @@ export function HiringLeaderboard() {
       <div className="fade-up mb-6">
         <SectionLabel>Select Job Opening</SectionLabel>
         <div className="flex gap-2.5 flex-wrap">
-          {MOCK_OPENINGS.map((o: any) => (
+          {openings.map((o: any) => (
             <button
               key={o.id}
               onClick={() => setSelectedOpening(o)}
@@ -158,15 +217,17 @@ export function HiringLeaderboard() {
           { label: "Shortlisted", val: selectedOpening.shortlisted },
           {
             label: "In Progress",
-            val: MOCK_CANDIDATES.filter((c: any) => c.status === "in_progress")
+            val: candidates.filter((c: any) => c.status === "in_progress")
               .length,
           },
           {
             label: "Avg Score",
-            val: Math.round(
-              MOCK_CANDIDATES.reduce((a: number, b: any) => a + b.score, 0) /
-                MOCK_CANDIDATES.length,
-            ),
+            val: candidates.length
+              ? Math.round(
+                  candidates.reduce((a: number, b: any) => a + b.score, 0) /
+                    candidates.length,
+                )
+              : 0,
           },
         ].map((s: any) => (
           <div
