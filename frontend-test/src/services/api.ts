@@ -238,6 +238,31 @@ export const interviewsApi = {
       method: "POST",
       body: JSON.stringify({ roundNumber }),
     }),
+
+  // ── Assessment link sending ────────────────────────────────────
+
+  /** Send assessment links to ALL eligible candidates for a specific round */
+  sendAssessmentLinks: (
+    jobId: string,
+    roundNumber: number,
+    customMessage?: string,
+  ) =>
+    request(`/interviews/job/${jobId}/send-assessment-links`, {
+      method: "POST",
+      body: JSON.stringify({ roundNumber, customMessage }),
+    }),
+
+  /** Send assessment link to a SINGLE candidate for a specific round */
+  sendAssessmentLink: (
+    jobId: string,
+    candidateId: string,
+    roundNumber: number,
+    customMessage?: string,
+  ) =>
+    request(`/interviews/job/${jobId}/send-assessment-link/${candidateId}`, {
+      method: "POST",
+      body: JSON.stringify({ roundNumber, customMessage }),
+    }),
 };
 
 /* ─── Token helpers ───────────────────────────────────────────── */

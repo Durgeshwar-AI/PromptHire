@@ -9,7 +9,10 @@ import cron from "node-cron";
 import JobRole from "../models/JobRole.model.js";
 import InterviewProgress from "../models/InterviewProgress.model.js";
 import ScreeningCandidate from "../models/candidate.screening.model.js";
-import { sendSchedulingEmail } from "./mail.services.js";
+import {
+  sendSchedulingEmail,
+  sendAssessmentLinkEmail,
+} from "./mail.services.js";
 
 // ── Stage icon for notification messages ──────────────────────────
 const STAGE_ICONS = {
@@ -142,16 +145,29 @@ async function processStageAdvancement() {
             progress.status = "InProgress";
             await progress.save();
 
-            // Notify candidate by email (if mail service supports it)
+            // Send assessment link email (preferred) or scheduling email
             try {
-              if (typeof sendSchedulingEmail === "function") {
-                await sendSchedulingEmail(
-                  progress.candidateEmail,
-                  progress.candidateName,
-                  job.title,
-                  stage,
-                );
-              }
+              const candidateId = progress.candidateId?.toString();
+              // Try sending the dedicated assessment link email first
+              await sendAssessmentLinkEmail({
+                to: progress.candidateEmail,
+                name: progress.candidateName,
+                jobTitle: job.title,
+                jobId: job._id.toString(),
+                candidateId,
+                stage,
+              }).catch(async () => {
+                // Fallback to scheduling email with link
+                if (typeof sendSchedulingEmail === "function") {
+                  await sendSchedulingEmail(
+                    progress.candidateEmail,
+                    progress.candidateName,
+                    job.title,
+                    stage,
+                    { jobId: job._id.toString(), candidateId },
+                  );
+                }
+              });
             } catch (mailErr) {
               console.warn(
                 `[PipelineScheduler] Email failed for ${progress.candidateEmail}:`,
