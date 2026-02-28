@@ -35,12 +35,17 @@ export function PublicNav({ onNavigate, currentPage }: any) {
           </span>
         ))}
         <div className="w-px h-5 bg-border-clr" />
-        <Btn size="sm" variant="secondary" onClick={() => onNavigate?.("login-company")}>
-          Company Login
-        </Btn>
-        <Btn size="sm" onClick={() => onNavigate?.("register-company")}>
-          Get Started Free
-        </Btn>
+        {currentPage && currentPage.includes("candidate") ? (
+          <>
+            <Btn size="sm" variant="secondary" onClick={() => onNavigate?.("login-candidate")}>Login</Btn>
+            <Btn size="sm" onClick={() => onNavigate?.("register-candidate")}>Sign Up</Btn>
+          </>
+        ) : (
+          <>
+            <Btn size="sm" variant="secondary" onClick={() => onNavigate?.("login-company")}>Company Login</Btn>
+            <Btn size="sm" onClick={() => onNavigate?.("register-company")}>Get Started Free</Btn>
+          </>
+        )}
       </div>
     </nav>
   );

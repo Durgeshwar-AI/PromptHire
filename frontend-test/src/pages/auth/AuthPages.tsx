@@ -55,7 +55,7 @@ function AuthShell({ title, subtitle, tag, children, footer }: any) {
   );
 }
 
-function OrDivider() {
+export function OrDivider() {
   return (
     <div className="flex items-center gap-3">
       <div className="flex-1 h-px bg-border-clr" />
