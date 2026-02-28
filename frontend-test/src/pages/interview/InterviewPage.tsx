@@ -1,5 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Conversation } from "@11labs/client";
 import { Btn } from "../../assets/components/shared/Btn";
+import { interviewSessionApi } from "../../services/api";
 
 type Role = "ai" | "candidate";
 
@@ -8,33 +11,7 @@ interface Message {
   text: string;
 }
 
-interface NavigateProps {
-  onNavigate?: (target: string) => void;
-}
-
-const TRANSCRIPT: Message[] = [
-  {
-    role: "ai",
-    text: "Hi Arjun, I've reviewed your resume and I'm excited to learn more about your work. Let's start with your experience at Zomato. You mentioned you built a real-time order tracking system. Can you walk me through the architecture decisions you made?",
-  },
-  {
-    role: "candidate",
-    text: "Sure! So the main challenge was sub-second latency for 50k concurrent orders. We ended up using a combination of WebSockets for the frontend connection and Redis pub/sub as the message broker between our delivery microservices.",
-  },
-  {
-    role: "ai",
-    text: "Interesting choice. Why Redis pub/sub over something like Kafka for that use case? What trade-offs did you consider?",
-  },
-  {
-    role: "candidate",
-    text: "Kafka would have been better for durability and replay, but for order tracking we prioritised lower latency and simpler ops overhead. Orders have a natural TTL so we didn't need long-term retention. Redis gave us sub-5ms message delivery which Kafka couldn't reliably match at that throughput.",
-  },
-  {
-    role: "ai",
-    text: "That's a solid reasoning. One follow-up — how did you handle the scenario where a Redis node goes down during peak traffic? Did you implement any failover strategy?",
-  },
-];
-
+/* ─── Animated voice bars ─── */
 function VoiceWave({ active }: { active: boolean }) {
   return (
     <div className="flex gap-1 items-end h-10 justify-center">
@@ -56,16 +33,23 @@ function VoiceWave({ active }: { active: boolean }) {
   );
 }
 
-export function InterviewPage({ onNavigate }: NavigateProps) {
+/* ─── Main Interview Page ─── */
+export function InterviewPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const jobId = searchParams.get("jobId") ?? "";
+
   const [elapsed, setElapsed] = useState(0);
-  const [aiTalking, setAiTalking] = useState(true);
-  const [userTalking, setUserTalking] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([TRANSCRIPT[0]]);
-  const [msgIdx, setMsgIdx] = useState(0);
+  const [agentSpeaking, setAgentSpeaking] = useState(false);
+  const [userSpeaking, setUserSpeaking] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [muted, setMuted] = useState(false);
   const [ended, setEnded] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [connecting, setConnecting] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
+  const conversationRef = useRef<ReturnType<typeof Conversation.startSession> extends Promise<infer T> ? T : never>();
 
   /* Timer */
   useEffect(() => {
@@ -74,30 +58,84 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
     return () => clearInterval(t);
   }, [ended]);
 
-  /* Simulate conversation flow */
-  useEffect(() => {
-    if (msgIdx >= TRANSCRIPT.length - 1) return;
-    const next = TRANSCRIPT[msgIdx + 1];
-    const isAI = next.role === "ai";
-    const delay = isAI ? 3200 : 2000;
-    const timer = setTimeout(() => {
-      setMessages((m) => [...m, next]);
-      setMsgIdx((i) => i + 1);
-      setAiTalking(isAI);
-      setUserTalking(!isAI);
-      if (!isAI) setTimeout(() => setUserTalking(false), 1800);
-    }, delay);
-    return () => clearTimeout(timer);
-  }, [msgIdx]);
-
+  /* Auto-scroll transcript */
   useEffect(() => {
     chatRef.current?.scrollTo({ top: 9999, behavior: "smooth" });
   }, [messages]);
 
+  /* Start ElevenLabs session */
+  const startConversation = useCallback(async () => {
+    try {
+      setConnecting(true);
+      setError(null);
+
+      // Request mic permission
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Get signed URL from our backend
+      const { signedUrl } = await interviewSessionApi.startSession(jobId);
+
+      const conversation = await Conversation.startSession({
+        signedUrl,
+        onConnect: () => {
+          setConnecting(false);
+        },
+        onDisconnect: () => {
+          setEnded(true);
+          setShowReport(true);
+        },
+        onModeChange: ({ mode }) => {
+          setAgentSpeaking(mode === "speaking");
+          setUserSpeaking(mode === "listening");
+        },
+        onMessage: ({ message, source }) => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: source === "ai" ? "ai" : "candidate",
+              text: message,
+            },
+          ]);
+        },
+        onError: (err) => {
+          console.error("ElevenLabs error:", err);
+          setError(typeof err === "string" ? err : "Connection error");
+        },
+      });
+
+      conversationRef.current = conversation;
+    } catch (err) {
+      console.error("Failed to start interview session:", err);
+      setConnecting(false);
+      setError(
+        err instanceof Error ? err.message : "Failed to start session",
+      );
+    }
+  }, [jobId]);
+
+  useEffect(() => {
+    startConversation();
+    return () => {
+      conversationRef.current?.endSession().catch(() => {});
+    };
+  }, [startConversation]);
+
+  /* Mute / unmute */
+  useEffect(() => {
+    if (!conversationRef.current) return;
+    conversationRef.current.setVolume({ volume: muted ? 0 : 1 });
+  }, [muted]);
+
+  const handleEnd = async () => {
+    setEnded(true);
+    await conversationRef.current?.endSession().catch(() => {});
+    setShowReport(true);
+  };
+
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  if (showReport) return <ReportView onNavigate={onNavigate} />;
+  if (showReport) return <ReportView />;
 
   return (
     <div className="min-h-screen bg-secondary flex flex-col">
@@ -112,9 +150,9 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
         <div className="flex items-center gap-5">
           {/* Live badge */}
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            <span className={`w-2 h-2 rounded-full ${connecting ? "bg-warning animate-pulse" : "bg-primary animate-pulse"}`} />
             <span className="font-display font-extrabold text-[11px] text-primary tracking-[0.15em]">
-              LIVE
+              {connecting ? "CONNECTING…" : "LIVE"}
             </span>
           </div>
           {/* Timer */}
@@ -123,6 +161,19 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
           </div>
         </div>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="bg-danger/20 border-b border-danger text-danger text-sm font-body text-center py-2 px-4">
+          {error}
+          <button
+            className="ml-3 underline cursor-pointer font-bold"
+            onClick={() => { setError(null); startConversation(); }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="flex-1 grid grid-cols-[1fr_360px] overflow-hidden">
@@ -133,7 +184,7 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
             <div
               className={[
                 "w-[120px] h-[120px] mx-auto mb-5 rounded-full flex items-center justify-center text-[52px] transition-all duration-200",
-                aiTalking
+                agentSpeaking
                   ? "bg-primary border-[3px] border-primary shadow-[0_0_40px_rgba(232,82,26,0.27)]"
                   : "bg-white/[0.08] border-[3px] border-white/[0.15]",
               ].join(" ")}
@@ -144,12 +195,12 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
               HR11 AI Interviewer
             </div>
             <div className="font-body text-xs text-white/40">
-              {aiTalking ? "Speaking…" : "Listening…"}
+              {connecting ? "Connecting…" : agentSpeaking ? "Speaking…" : "Listening…"}
             </div>
           </div>
 
           {/* Voice wave */}
-          <VoiceWave active={aiTalking} />
+          <VoiceWave active={agentSpeaking} />
 
           {/* Divider */}
           <div className="w-[200px] h-px bg-white/[0.08]" />
@@ -159,17 +210,17 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
             <div
               className={[
                 "w-20 h-20 mx-auto mb-3 rounded-full flex items-center justify-center font-display font-black text-2xl text-white transition-all duration-200",
-                userTalking
+                userSpeaking
                   ? "bg-white/[0.15] border-2 border-white/50 shadow-[0_0_24px_rgba(255,255,255,0.15)]"
                   : "bg-white/[0.05] border-2 border-white/10",
               ].join(" ")}
             >
-              AM
+              YOU
             </div>
             <div className="font-display font-extrabold text-sm text-white uppercase mb-1">
-              Arjun Mehta
+              Candidate
             </div>
-            <VoiceWave active={userTalking && !muted} />
+            <VoiceWave active={userSpeaking && !muted} />
           </div>
 
           {/* Controls */}
@@ -187,11 +238,9 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
             </button>
 
             <button
-              onClick={() => {
-                setEnded(true);
-                setShowReport(true);
-              }}
-              className="px-6 h-[52px] bg-danger border-2 border-danger text-white cursor-pointer font-display font-extrabold text-[13px] tracking-[0.1em] uppercase"
+              onClick={handleEnd}
+              disabled={connecting}
+              className="px-6 h-[52px] bg-danger border-2 border-danger text-white cursor-pointer font-display font-extrabold text-[13px] tracking-[0.1em] uppercase disabled:opacity-50"
             >
               End Interview
             </button>
@@ -219,6 +268,11 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
             ref={chatRef}
             className="flex-1 overflow-y-auto py-5 px-4 flex flex-col gap-4"
           >
+            {messages.length === 0 && !error && (
+              <div className="text-center text-white/30 font-body text-sm mt-8">
+                {connecting ? "Connecting to AI interviewer…" : "Waiting for conversation to begin…"}
+              </div>
+            )}
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -233,7 +287,7 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
                     msg.role === "ai" ? "text-primary" : "text-white/40",
                   ].join(" ")}
                 >
-                  {msg.role === "ai" ? "HR11 AI" : "Arjun Mehta"}
+                  {msg.role === "ai" ? "HR11 AI" : "You"}
                 </div>
                 <div
                   className={[
@@ -248,7 +302,7 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
               </div>
             ))}
             {/* Typing indicator */}
-            {aiTalking && msgIdx < TRANSCRIPT.length - 1 && (
+            {agentSpeaking && (
               <div className="flex gap-1 py-2 px-1">
                 {[0, 1, 2].map((i) => (
                   <div
@@ -269,7 +323,8 @@ export function InterviewPage({ onNavigate }: NavigateProps) {
 }
 
 /* ─── Post-Interview Report ─── */
-function ReportView({ onNavigate }: NavigateProps) {
+function ReportView() {
+  const navigate = useNavigate();
   const scores = [
     { label: "Technical Depth", score: 88 },
     { label: "Communication Clarity", score: 82 },
@@ -364,11 +419,11 @@ function ReportView({ onNavigate }: NavigateProps) {
         <div className="mt-6 flex gap-3 justify-center">
           <Btn
             variant="secondary"
-            onClick={() => onNavigate?.("candidate-profile")}
+            onClick={() => navigate("/candidate-profile")}
           >
             Back to Profile
           </Btn>
-          <Btn onClick={() => onNavigate?.("interview-entry")}>
+          <Btn onClick={() => navigate("/interview-entry")}>
             View Full Report
           </Btn>
         </div>

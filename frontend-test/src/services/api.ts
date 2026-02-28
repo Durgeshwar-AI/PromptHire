@@ -265,6 +265,22 @@ export const interviewsApi = {
     }),
 };
 
+/* ─── ElevenLabs Interview Session ────────────────────────────── */
+
+export const interviewSessionApi = {
+  /** Get a signed URL to start an ElevenLabs Conversational AI session */
+  startSession: (jobId: string) =>
+    request<{
+      signedUrl: string;
+      agentId: string;
+      interviewId: string;
+      metadata: Record<string, string>;
+    }>("/interview/token", {
+      method: "POST",
+      body: JSON.stringify({ jobId, mode: "interview" }),
+    }),
+};
+
 /* ─── Token helpers ───────────────────────────────────────────── */
 
 export function saveAuth(token: string, user: StoredUser) {

@@ -1,11 +1,8 @@
 import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "../../assets/components/shared/Card";
 import { Btn } from "../../assets/components/shared/Btn";
 import { Tag, StatusPill } from "../../assets/components/shared/Badges";
-
-interface NavigateProps {
-  onNavigate?: (target: string) => void;
-}
 
 const JOB = {
   title: "Senior Backend Engineer",
@@ -25,8 +22,23 @@ const JOB = {
   ],
 };
 
-export function InterviewEntryPage({ onNavigate }: NavigateProps) {
+export function InterviewEntryPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const jobId = searchParams.get("jobId") ?? "";
   const [micOk, setMicOk] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
+
+  const testMic = async () => {
+    try {
+      setMicError(null);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+      setMicOk(true);
+    } catch {
+      setMicError("Microphone access denied. Please allow mic access and try again.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-tertiary">
@@ -171,7 +183,7 @@ export function InterviewEntryPage({ onNavigate }: NavigateProps) {
                   Mic Check
                 </div>
                 <button
-                  onClick={() => setMicOk(true)}
+                  onClick={testMic}
                   className={[
                     "w-full py-3 border-2 cursor-pointer font-display font-extrabold text-[13px] tracking-[0.1em] uppercase transition-colors flex items-center justify-center gap-2",
                     micOk
@@ -181,6 +193,9 @@ export function InterviewEntryPage({ onNavigate }: NavigateProps) {
                 >
                   {micOk ? "✓ Microphone Ready" : "🎙️ Test Microphone"}
                 </button>
+                {micError && (
+                  <p className="text-xs text-danger font-body mt-2">{micError}</p>
+                )}
                 {micOk && (
                   <div className="flex gap-[3px] items-end h-8 mt-2.5 justify-center">
                     {[0, 1, 2, 3, 4, 5, 6].map((i) => (
@@ -200,7 +215,7 @@ export function InterviewEntryPage({ onNavigate }: NavigateProps) {
             {/* Start button */}
             <Btn
               fullWidth
-              onClick={() => onNavigate?.("interview")}
+              onClick={() => navigate(`/interview${jobId ? `?jobId=${jobId}` : ""}`)}
               disabled={!micOk}
               style={{ padding: "18px", fontSize: 16 }}
             >
