@@ -49,7 +49,7 @@ export function InterviewPage() {
   const [connecting, setConnecting] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
-  const conversationRef = useRef<ReturnType<typeof Conversation.startSession> extends Promise<infer T> ? T : never>();
+  const conversationRef = useRef<ReturnType<typeof Conversation.startSession> extends Promise<infer T> ? T : never>(null);
 
   /* Timer */
   useEffect(() => {
@@ -135,7 +135,6 @@ export function InterviewPage() {
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  if (showReport) return <ReportView />;
   if (showReport) return <ReportView />;
 
   return (
@@ -326,8 +325,6 @@ export function InterviewPage() {
 /* ─── Post-Interview Report ─── */
 function ReportView() {
   const navigate = useNavigate();
-function ReportView() {
-  const navigate = useNavigate();
   const scores = [
     { label: "Technical Depth", score: 88 },
     { label: "Communication Clarity", score: 82 },
@@ -422,7 +419,6 @@ function ReportView() {
         <div className="mt-6 flex gap-3 justify-center">
           <Btn
             variant="secondary"
-            onClick={() => navigate("/candidate-profile")}
             onClick={() => navigate("/candidate-profile")}
           >
             Back to Profile
