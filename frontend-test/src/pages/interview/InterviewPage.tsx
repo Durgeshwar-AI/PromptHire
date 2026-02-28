@@ -136,6 +136,7 @@ export function InterviewPage() {
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   if (showReport) return <ReportView />;
+  if (showReport) return <ReportView />;
 
   return (
     <div className="min-h-screen bg-secondary flex flex-col">
@@ -325,6 +326,8 @@ export function InterviewPage() {
 /* ─── Post-Interview Report ─── */
 function ReportView() {
   const navigate = useNavigate();
+function ReportView() {
+  const navigate = useNavigate();
   const scores = [
     { label: "Technical Depth", score: 88 },
     { label: "Communication Clarity", score: 82 },
@@ -419,6 +422,7 @@ function ReportView() {
         <div className="mt-6 flex gap-3 justify-center">
           <Btn
             variant="secondary"
+            onClick={() => navigate("/candidate-profile")}
             onClick={() => navigate("/candidate-profile")}
           >
             Back to Profile

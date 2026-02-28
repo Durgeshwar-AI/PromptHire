@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
 import { Card } from "../../assets/components/shared/Card";
 import { resumeApi, getStoredUser } from "../../services/api";
+import { startRound, completeRound } from "../../services/pipeline";
 
 /* ── mock resume data pulled from "profile" ── */
 const PROFILE_RESUME = {
@@ -25,6 +26,11 @@ export function ResumeScreeningRound() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<Result>(null);
   const [useApi, setUseApi] = useState(!!candidateId);
+
+  /* Mark this round as current on mount */
+  useEffect(() => {
+    startRound("resume");
+  }, []);
 
   /* auto-submit on mount */
   useEffect(() => {
@@ -234,7 +240,7 @@ export function ResumeScreeningRound() {
               {/* Next step */}
               {result.selected && (
                 <div className="flex justify-end">
-                  <Btn onClick={() => navigate("/round/aptitude-test")}>
+                  <Btn onClick={() => { completeRound("resume"); navigate("/round/aptitude-test"); }}>
                     Proceed to Aptitude Test →
                   </Btn>
                 </div>

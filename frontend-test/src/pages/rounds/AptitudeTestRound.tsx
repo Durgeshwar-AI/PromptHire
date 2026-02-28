@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
 import { aptitudeApi, getStoredUser } from "../../services/api";
+import { startRound, completeRound } from "../../services/pipeline";
 
 /* ── Fallback mock questions (used when backend is unavailable) ── */
 const MOCK_QUESTIONS = Array.from({ length: 25 }, (_, i) => {
@@ -245,6 +246,9 @@ export function AptitudeTestRound() {
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
   const ss = String(timeLeft % 60).padStart(2, "0");
 
+  /* mark pipeline */
+  useEffect(() => { startRound("aptitude"); }, []);
+
   /* Fetch questions from backend, fallback to mock */
   useEffect(() => {
     let cancelled = false;
@@ -379,7 +383,7 @@ export function AptitudeTestRound() {
               {submitting ? "Submitting…" : "Submit Test"}
             </Btn>
           ) : (
-            <Btn size="sm" variant="secondary" onClick={() => navigate("/round/coding-challenge")}>
+            <Btn size="sm" variant="secondary" onClick={() => { completeRound("aptitude"); navigate("/round/coding-challenge"); }}>
               Next Round →
             </Btn>
           )}
@@ -404,7 +408,7 @@ export function AptitudeTestRound() {
               </div>
             </div>
             {(result?.percentage ?? 0) >= 70 && (
-              <Btn onClick={() => navigate("/round/coding-challenge")}>
+              <Btn onClick={() => { completeRound("aptitude"); navigate("/round/coding-challenge"); }}>
                 Proceed to Coding Challenge →
               </Btn>
             )}

@@ -247,8 +247,10 @@ export function RecentOpenings() {
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((job) => (
-              <Card key={job.id} hover onClick={() => navigate(`/interview-entry`)}>
+            {filtered.map((job) => {
+              const applyUrl = `/round/resume-screening?jobId=${job.id}&jobTitle=${encodeURIComponent(job.title)}`;
+              return (
+              <Card key={job.id} hover onClick={() => navigate(applyUrl)}>
                 <div className="px-5 py-[18px]">
                   {/* Company & posted */}
                   <div className="flex items-start justify-between mb-3">
@@ -293,13 +295,14 @@ export function RecentOpenings() {
 
                   {/* CTA */}
                   <div className="mt-4">
-                    <Btn fullWidth size="sm">
+                    <Btn fullWidth size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); navigate(applyUrl); }}>
                       Apply Now →
                     </Btn>
                   </div>
                 </div>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

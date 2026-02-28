@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
 import { technicalApi, getStoredUser } from "../../services/api";
+import { startRound, completeRound } from "../../services/pipeline";
 
 /* ── Fallback mock questions ── */
 const MOCK_QUESTIONS = Array.from({ length: 25 }, (_, i) => {
@@ -291,6 +292,9 @@ export function TechnicalInterviewRound() {
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
   const ss = String(timeLeft % 60).padStart(2, "0");
 
+  /* mark pipeline */
+  useEffect(() => { startRound("technical"); }, []);
+
   /* Fetch questions from backend, fallback to mock */
   useEffect(() => {
     let cancelled = false;
@@ -450,7 +454,7 @@ export function TechnicalInterviewRound() {
                 {(result?.percentage ?? 0) >= 70 ? "✅  Congratulations! You've completed all rounds." : "❌  Not selected"}
               </div>
             </div>
-            <Btn onClick={() => navigate("/candidate-profile")}>
+            <Btn onClick={() => { completeRound("technical"); navigate("/candidate-profile"); }}>
               Back to Profile
             </Btn>
           </div>
