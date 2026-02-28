@@ -2,6 +2,7 @@ import cron from "node-cron";
 import JobRole from "../models/JobRole.model.js";
 import ScreeningCandidate from "../models/candidate.screening.model.js";
 import { sendRejectionEmail } from "./mail.services.js";
+import { upsertInterviewProgressRecords } from "./interviewProgress.service.js";
 
 /**
  * Process a single job that has passed its submission deadline:
@@ -11,30 +12,49 @@ import { sendRejectionEmail } from "./mail.services.js";
  *   4. Mark autoRejectionDone on the job so it's never processed again.
  */
 async function processJobAutoReject(job) {
-  const jobId    = job._id.toString();
+  const jobId = job._id.toString();
   const jobTitle = job.title;
-  const topN     = job.topN || 5;
+  const topN = job.topN || 5;
 
-  console.log(`[AutoReject] Processing job "${jobTitle}" (${jobId}) — deadline was ${job.submissionDeadline}`);
+  console.log(
+    `[AutoReject] Processing job "${jobTitle}" (${jobId}) — deadline was ${job.submissionDeadline}`,
+  );
 
   // ── Mark any still-pending candidates as rejected (they missed the deadline) ──
-  const pending = await ScreeningCandidate.find({ jobId, status: "pending" }).lean();
+  const pending = await ScreeningCandidate.find({
+    jobId,
+    status: "pending",
+  }).lean();
   if (pending.length > 0) {
     await Promise.allSettled(
       pending.map((c) =>
-        c.email ? sendRejectionEmail(c.email, c.name, jobTitle) : Promise.resolve()
-      )
+        c.email
+          ? sendRejectionEmail(c.email, c.name, jobTitle)
+          : Promise.resolve(),
+      ),
     );
-    await ScreeningCandidate.deleteMany({ _id: { $in: pending.map((c) => c._id) } });
-    console.log(`[AutoReject] jobId=${jobId} — ${pending.length} pending candidate(s) rejected (missed deadline)`);
+    await ScreeningCandidate.deleteMany({
+      _id: { $in: pending.map((c) => c._id) },
+    });
+    console.log(
+      `[AutoReject] jobId=${jobId} — ${pending.length} pending candidate(s) rejected (missed deadline)`,
+    );
   }
 
   // ── Rank screened candidates ───────────────────────────────────
-  const candidates = await ScreeningCandidate.find({ jobId, status: "screened" }).lean();
+  const candidates = await ScreeningCandidate.find({
+    jobId,
+    status: "screened",
+  }).lean();
 
   if (candidates.length === 0) {
-    await JobRole.findByIdAndUpdate(jobId, { autoRejectionDone: true, status: "Closed" });
-    console.log(`[AutoReject] jobId=${jobId} — no screened candidates, job closed`);
+    await JobRole.findByIdAndUpdate(jobId, {
+      autoRejectionDone: true,
+      status: "Closed",
+    });
+    console.log(
+      `[AutoReject] jobId=${jobId} — no screened candidates, job closed`,
+    );
     return;
   }
 
@@ -45,23 +65,40 @@ async function processJobAutoReject(job) {
     })
     .sort((a, b) => b._bestScore - a._bestScore);
 
-  const kept     = ranked.slice(0, topN);
+  const kept = ranked.slice(0, topN);
   const rejected = ranked.slice(topN);
+  const keptWithRank = kept.map((candidate, index) => ({
+    ...candidate,
+    _rank: index + 1,
+  }));
 
   // ── Shortlist top N ────────────────────────────────────────────
-  if (kept.length > 0) {
-    await ScreeningCandidate.updateMany(
-      { _id: { $in: kept.map((c) => c._id) } },
-      { $set: { status: "shortlisted" } }
+  if (keptWithRank.length > 0) {
+    await ScreeningCandidate.bulkWrite(
+      keptWithRank.map((candidate) => ({
+        updateOne: {
+          filter: { _id: candidate._id },
+          update: {
+            $set: {
+              status: "shortlisted",
+              shortlistRank: candidate._rank,
+            },
+          },
+        },
+      })),
     );
+
+    await upsertInterviewProgressRecords(job, keptWithRank);
   }
 
   // ── Reject & email the rest ────────────────────────────────────
   if (rejected.length > 0) {
     const emailResults = await Promise.allSettled(
       rejected.map((c) =>
-        c.email ? sendRejectionEmail(c.email, c.name, jobTitle) : Promise.resolve()
-      )
+        c.email
+          ? sendRejectionEmail(c.email, c.name, jobTitle)
+          : Promise.resolve(),
+      ),
     );
 
     const failedEmails = emailResults
@@ -69,22 +106,28 @@ async function processJobAutoReject(job) {
       .filter(Boolean);
 
     if (failedEmails.length > 0) {
-      console.warn(`[AutoReject] Failed to email ${failedEmails.length} candidate(s):`, failedEmails);
+      console.warn(
+        `[AutoReject] Failed to email ${failedEmails.length} candidate(s):`,
+        failedEmails,
+      );
     }
 
     const rejectedIds = rejected.map((c) => c._id);
     await ScreeningCandidate.updateMany(
       { _id: { $in: rejectedIds } },
-      { $set: { status: "rejected" } }
+      { $set: { status: "rejected" } },
     );
     await ScreeningCandidate.deleteMany({ _id: { $in: rejectedIds } });
   }
 
   // ── Mark the job as processed ──────────────────────────────────
-  await JobRole.findByIdAndUpdate(jobId, { autoRejectionDone: true, status: "Closed" });
+  await JobRole.findByIdAndUpdate(jobId, {
+    autoRejectionDone: true,
+    ...(keptWithRank.length === 0 && { status: "Closed" }),
+  });
 
   console.log(
-    `[AutoReject] jobId=${jobId} — kept ${kept.length}, rejected & deleted ${rejected.length}`
+    `[AutoReject] jobId=${jobId} — kept ${keptWithRank.length}, rejected & deleted ${rejected.length}`,
   );
 }
 
@@ -97,14 +140,16 @@ async function runScheduledAutoReject() {
     const now = new Date();
 
     const expiredJobs = await JobRole.find({
-      submissionDeadline:  { $lte: now },
-      autoRejectionDone:   false,
-      status:              { $ne: "Closed" },
+      submissionDeadline: { $lte: now },
+      autoRejectionDone: false,
+      status: { $ne: "Closed" },
     });
 
     if (expiredJobs.length === 0) return;
 
-    console.log(`[AutoReject] Found ${expiredJobs.length} expired job(s) to process`);
+    console.log(
+      `[AutoReject] Found ${expiredJobs.length} expired job(s) to process`,
+    );
 
     for (const job of expiredJobs) {
       await processJobAutoReject(job);
