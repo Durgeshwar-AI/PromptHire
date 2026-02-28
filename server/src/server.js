@@ -1,8 +1,9 @@
-import "dotenv/config";              // must be FIRST — before any other import
+import "dotenv/config"; // must be FIRST — before any other import
 import app from "./app.js";
 import connectDB from "./config/db.js";
 import { initEvaluationQueue } from "./workers/evaluationQueue.js";
 import { startAutoRejectScheduler } from "./services/autoReject.services.js";
+import { startPipelineAdvancementScheduler } from "./services/pipelineScheduler.service.js";
 
 const PORT = process.env.PORT || 5000;
 
@@ -12,6 +13,9 @@ connectDB().then(async () => {
 
   // Start the auto-rejection cron (runs after submission deadlines expire)
   startAutoRejectScheduler();
+
+  // Start the pipeline stage advancement scheduler
+  startPipelineAdvancementScheduler();
 
   app.listen(PORT, () =>
     console.log(`AgenticHire server running on port ${PORT}`),
