@@ -15,6 +15,7 @@ router.post("/", authenticateHR, async (req, res) => {
       submissionDeadline,
       topN,
       totalRounds,
+      pipeline,
     } = req.body;
 
     if (!title) {
@@ -31,6 +32,7 @@ router.post("/", authenticateHR, async (req, res) => {
       }),
       ...(topN && { topN: Number(topN) }),
       ...(totalRounds !== undefined && { totalRounds: Number(totalRounds) }),
+      ...(Array.isArray(pipeline) && { pipeline }),
     });
 
     res.status(201).json(jobRole);
@@ -87,6 +89,7 @@ router.put("/:id", authenticateHR, async (req, res) => {
       submissionDeadline,
       topN,
       totalRounds,
+      pipeline,
     } = req.body;
 
     const update = { title, description, skills, status };
@@ -96,6 +99,7 @@ router.put("/:id", authenticateHR, async (req, res) => {
         : null;
     if (topN !== undefined) update.topN = Number(topN);
     if (totalRounds !== undefined) update.totalRounds = Number(totalRounds);
+    if (Array.isArray(pipeline)) update.pipeline = pipeline;
 
     const job = await JobRole.findByIdAndUpdate(req.params.id, update, {
       new: true,
