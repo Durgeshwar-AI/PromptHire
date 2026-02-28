@@ -19,36 +19,28 @@ import { InterviewPage } from "./pages/interview/InterviewPage";
 // Public
 import { WhyHR11Page } from "./pages/public/WhyHR11Page";
 import { HowItWorksPage } from "./pages/public/HowItWorksPage";
+import { RoleChoice } from "./pages/public/RoleChoice.tsx";
+import { CandidateHome } from "./pages/public/CandidateHome.tsx";
+import { CompanyHome } from "./pages/public/CompanyHome.tsx";
 
-const ROUTES: Record<string, any> = {
-  home: null,
-  why: WhyHR11Page,
-  how: HowItWorksPage,
-  "login-company": CompanyLogin,
-  "register-company": CompanyRegister,
-  "login-candidate": CandidateLogin,
-  "register-candidate": CandidateRegister,
-  dashboard: CompanyDashboard,
-  leaderboard: HiringLeaderboard,
-  pipeline: PipelineBuilder,
-  "candidate-profile": CandidateProfile,
-  "interview-entry": InterviewEntryPage,
-  interview: InterviewPage,
-};
+import {BrowserRouter, Routes, Route, Navigate} from "react-router-dom";
 
 export default function App() {
-  const [page, setPage] = useState("why");
 
-  const navigate = (key: string) => {
-    if (key === "home") {
-      setPage("why");
-      return;
-    }
-    if (ROUTES[key] !== undefined) setPage(key);
-    else console.warn(`[HR11 Router] Unknown route: "${key}"`);
-  };
 
-  const PageComponent = ROUTES[page] || WhyHR11Page;
-
-  return <PageComponent onNavigate={navigate} />;
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public */}
+        <Route path="/" element={<RoleChoice />} />
+        <Route path="/why-hr11" element={<WhyHR11Page />} />
+        <Route path="/how-it-works" element={<HowItWorksPage />} />
+        <Route path="/company-home" element={<CompanyHome />} />
+        <Route path="/candidate-home" element={<CandidateHome />} />
+        <Route path="/company-login" element={<CompanyLogin />} />
+        <Route path="/company-register" element={<CompanyRegister />} />
+        <Route path="/candidate-login" element={<CandidateLogin />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
