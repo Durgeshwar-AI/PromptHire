@@ -11,7 +11,6 @@ import livekitRoutes from "./routes/livekit/livekit.route.js";
 import agentToolsRoutes from "./routes/agents/agentTools.route.js";
 import resumeRoutes from "./routes/agents/resume.route.js";
 import formsRoutes from "./routes/forms/forms.route.js";
-import resumeRoutes from "./routes/agents/resume.route.js";
 
 const app = express();
 
