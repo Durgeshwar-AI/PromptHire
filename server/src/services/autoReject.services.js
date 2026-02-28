@@ -1,50 +1,8 @@
 import cron from "node-cron";
 import JobRole from "../models/JobRole.model.js";
 import ScreeningCandidate from "../models/candidate.screening.model.js";
-import InterviewProgress from "../models/InterviewProgress.model.js";
 import { sendRejectionEmail } from "./mail.services.js";
-
-function buildRoundSkeleton(totalRounds = 0) {
-  const safeCount = Math.max(Number(totalRounds) || 0, 0);
-  return Array.from({ length: safeCount }, (_, idx) => ({
-    roundNumber: idx + 1,
-    roundName: `Round ${idx + 1}`,
-    score: null,
-    status: "Pending",
-    updatedAt: null,
-  }));
-}
-
-async function upsertInterviewProgress(job, candidates = []) {
-  if (!candidates.length) return;
-
-  const totalRounds = job.totalRounds ?? 0;
-
-  await Promise.all(
-    candidates.map((candidate, idx) => {
-      const rounds = buildRoundSkeleton(totalRounds).map((round) => ({
-        ...round,
-      }));
-
-      return InterviewProgress.findOneAndUpdate(
-        {
-          candidateId: candidate._id,
-          jobId: job._id,
-        },
-        {
-          candidateName: candidate.name || "Candidate",
-          candidateEmail: candidate.email || "",
-          candidateScore: candidate._bestScore ?? 0,
-          totalRounds,
-          rounds,
-          status: totalRounds > 0 ? "Pending" : "Completed",
-          rank: candidate._rank ?? idx + 1,
-        },
-        { upsert: true, setDefaultsOnInsert: true },
-      );
-    }),
-  );
-}
+import { upsertInterviewProgressRecords } from "./interviewProgress.service.js";
 
 /**
  * Process a single job that has passed its submission deadline:
@@ -130,7 +88,7 @@ async function processJobAutoReject(job) {
       })),
     );
 
-    await upsertInterviewProgress(job, keptWithRank);
+    await upsertInterviewProgressRecords(job, keptWithRank);
   }
 
   // ── Reject & email the rest ────────────────────────────────────
