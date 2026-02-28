@@ -1,7 +1,12 @@
 import { useState } from "react";
 
 // Auth
-import { CompanyLogin, CompanyRegister, CandidateLogin, CandidateRegister } from "./pages/auth/AuthPages";
+import {
+  CompanyLogin,
+  CompanyRegister,
+  CandidateLogin,
+  CandidateRegister,
+} from "./pages/auth/AuthPages";
 // Company
 import { CompanyDashboard } from "./pages/company/CompanyDashboard";
 import { HiringLeaderboard } from "./pages/company/HiringLeaderboard";
@@ -35,7 +40,10 @@ export default function App() {
   const [page, setPage] = useState("why");
 
   const navigate = (key: string) => {
-    if (key === "home") { setPage("why"); return; }
+    if (key === "home") {
+      setPage("why");
+      return;
+    }
     if (ROUTES[key] !== undefined) setPage(key);
     else console.warn(`[HR11 Router] Unknown route: "${key}"`);
   };
