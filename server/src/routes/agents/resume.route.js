@@ -4,18 +4,6 @@ import { screenResume } from "../../services/aiService.services.js";
 import Candidate from "../../models/candidate.screening.model.js";
 
 const router = express.Router();
-/**
- * POST /api/candidates
- *
- * Submit a candidate with resume + any HR form fields.
- * HR teams can send any form fields they want — all captured in formData.
- *
- * multipart/form-data fields:
- *   - resume (file, required)         — PDF or DOCX
- *   - jobId  (string, optional)       — which job pipeline
- *   - source (string, optional)       — e.g. "linkedin"
- *   - ...anything else HR adds        — stored as-is in formData
- */
 router.post("/", upload.single("resume"), async (req, res) => {
   try {
     if (!req.file) {
@@ -49,16 +37,6 @@ router.post("/", upload.single("resume"), async (req, res) => {
   }
 });
 
-/**
- * POST /api/candidates/:id/screen
- *
- * Screen an existing candidate's resume against a job description.
- * Can be called multiple times (e.g. for different roles).
- *
- * Body (JSON):
- *   - jobTitle       (string, required)
- *   - jobDescription (string, required)
- */
 router.post("/:id/screen", async (req, res) => {
   try {
     const { jobTitle, jobDescription } = req.body;
@@ -78,8 +56,6 @@ router.post("/:id/screen", async (req, res) => {
       jobDescription,
       formData: candidate.formData, // HR form context helps Claude score more accurately
     });
-
-    // Append result (supports screening against multiple JDs over time)
     candidate.screeningResults.push(result);
     candidate.status = "screened";
     await candidate.save();
@@ -94,19 +70,6 @@ router.post("/:id/screen", async (req, res) => {
   }
 });
 
-/**
- * POST /api/candidates/submit-and-screen
- *
- * Convenience endpoint: upload resume + screen in one request.
- * Useful when HR wants instant results on submission.
- *
- * multipart/form-data fields:
- *   - resume          (file, required)
- *   - jobTitle        (string, required)
- *   - jobDescription  (string, required)
- *   - jobId, source   (optional)
- *   - ...any HR fields
- */
 router.post("/submit-and-screen", upload.single("resume"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "Resume file is required" });
@@ -155,24 +118,6 @@ router.post("/submit-and-screen", upload.single("resume"), async (req, res) => {
   }
 });
 
-/**
- * GET /api/candidates/:id
- * Fetch a candidate with all their screening results.
- */
-router.get("/:id", async (req, res) => {
-  try {
-    const candidate = await Candidate.findById(req.params.id);
-    if (!candidate) return res.status(404).json({ error: "Candidate not found" });
-    res.json(candidate);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * GET /api/candidates?jobId=xxx&status=screened&minScore=70
- * List candidates, optionally filtered by jobId, status, or minimum score.
- */
 router.get("/", async (req, res) => {
   try {
     const { jobId, status, minScore } = req.query;
