@@ -50,7 +50,12 @@ export function InterviewPage() {
   const [connecting, setConnecting] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
-  const conversationRef = useRef<ReturnType<typeof Conversation.startSession> extends Promise<infer T> ? T : never>(null);
+  const conversationRef =
+    useRef<
+      ReturnType<typeof Conversation.startSession> extends Promise<infer T>
+        ? T
+        : never
+    >(null);
 
   /* Timer */
   useEffect(() => {
@@ -108,9 +113,7 @@ export function InterviewPage() {
     } catch (err) {
       console.error("Failed to start interview session:", err);
       setConnecting(false);
-      setError(
-        err instanceof Error ? err.message : "Failed to start session",
-      );
+      setError(err instanceof Error ? err.message : "Failed to start session");
     }
   }, [jobId]);
 
@@ -151,7 +154,9 @@ export function InterviewPage() {
         <div className="flex items-center gap-5">
           {/* Live badge */}
           <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${connecting ? "bg-warning animate-pulse" : "bg-primary animate-pulse"}`} />
+            <span
+              className={`w-2 h-2 rounded-full ${connecting ? "bg-warning animate-pulse" : "bg-primary animate-pulse"}`}
+            />
             <span className="font-display font-extrabold text-[11px] text-primary tracking-[0.15em]">
               {connecting ? "CONNECTING…" : "LIVE"}
             </span>
@@ -169,7 +174,10 @@ export function InterviewPage() {
           {error}
           <button
             className="ml-3 underline cursor-pointer font-bold"
-            onClick={() => { setError(null); startConversation(); }}
+            onClick={() => {
+              setError(null);
+              startConversation();
+            }}
           >
             Retry
           </button>
@@ -189,14 +197,16 @@ export function InterviewPage() {
                   ? "bg-primary border-[3px] border-primary shadow-[0_0_40px_rgba(232,82,26,0.27)]"
                   : "bg-white/[0.08] border-[3px] border-white/[0.15]",
               ].join(" ")}
-            >
-              
-            </div>
+            ></div>
             <div className="font-display font-black text-lg text-white tracking-[0.05em] uppercase mb-1">
-              HR11 AI Interviewer
+              PromptHire AI Interviewer
             </div>
             <div className="font-body text-xs text-white/40">
-              {connecting ? "Connecting…" : agentSpeaking ? "Speaking…" : "Listening…"}
+              {connecting
+                ? "Connecting…"
+                : agentSpeaking
+                  ? "Speaking…"
+                  : "Listening…"}
             </div>
           </div>
 
@@ -271,7 +281,9 @@ export function InterviewPage() {
           >
             {messages.length === 0 && !error && (
               <div className="text-center text-white/30 font-body text-sm mt-8">
-                {connecting ? "Connecting to AI interviewer…" : "Waiting for conversation to begin…"}
+                {connecting
+                  ? "Connecting to AI interviewer…"
+                  : "Waiting for conversation to begin…"}
               </div>
             )}
             {messages.map((msg, i) => (
@@ -288,7 +300,7 @@ export function InterviewPage() {
                     msg.role === "ai" ? "text-primary" : "text-white/40",
                   ].join(" ")}
                 >
-                  {msg.role === "ai" ? "HR11 AI" : "You"}
+                  {msg.role === "ai" ? "PromptHire AI" : "You"}
                 </div>
                 <div
                   className={[
@@ -428,9 +440,7 @@ function ReportView({ jobId }: { jobId: string }) {
             const next = getNextRoundPath(jobId, "ai_voice_interview");
             const label = getNextRoundLabel(jobId, "ai_voice_interview");
             return next ? (
-              <Btn onClick={() => navigate(next)}>
-                Proceed to {label} →
-              </Btn>
+              <Btn onClick={() => navigate(next)}>Proceed to {label} →</Btn>
             ) : (
               <Btn onClick={() => navigate("/candidate-profile")}>
                 View Full Report
