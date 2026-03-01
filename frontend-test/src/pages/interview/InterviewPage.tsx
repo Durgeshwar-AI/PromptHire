@@ -78,11 +78,18 @@ export function InterviewPage() {
       // Request mic permission
       await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      // Get signed URL from our backend
-      const { signedUrl } = await interviewSessionApi.startSession(jobId);
+      // Get signed URL + interview prompt from our backend
+      const { signedUrl, systemPrompt, firstMessage } =
+        await interviewSessionApi.startSession(jobId);
 
       const conversation = await Conversation.startSession({
         signedUrl,
+        overrides: {
+          agent: {
+            prompt: { prompt: systemPrompt },
+            firstMessage,
+          },
+        },
         onConnect: () => {
           setConnecting(false);
         },
