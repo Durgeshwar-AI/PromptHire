@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-// import { Conversation } from "@11labs/client";
+import { Conversation } from "@11labs/client";
 import { Btn } from "../../assets/components/shared/Btn";
 import { interviewSessionApi } from "../../services/api";
+import { getNextRoundPath, getNextRoundLabel } from "../../services/pipeline";
 
 type Role = "ai" | "candidate";
 
@@ -135,7 +136,7 @@ export function InterviewPage() {
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  if (showReport) return <ReportView />;
+  if (showReport) return <ReportView jobId={jobId} />;
 
   return (
     <div className="min-h-screen bg-secondary flex flex-col">
@@ -323,7 +324,7 @@ export function InterviewPage() {
 }
 
 /* ─── Post-Interview Report ─── */
-function ReportView() {
+function ReportView({ jobId }: { jobId: string }) {
   const navigate = useNavigate();
   const scores = [
     { label: "Technical Depth", score: 88 },
@@ -423,9 +424,19 @@ function ReportView() {
           >
             Back to Profile
           </Btn>
-          <Btn onClick={() => navigate("/interview-entry")}>
-            View Full Report
-          </Btn>
+          {(() => {
+            const next = getNextRoundPath(jobId, "ai_voice_interview");
+            const label = getNextRoundLabel(jobId, "ai_voice_interview");
+            return next ? (
+              <Btn onClick={() => navigate(next)}>
+                Proceed to {label} →
+              </Btn>
+            ) : (
+              <Btn onClick={() => navigate("/candidate-profile")}>
+                View Full Report
+              </Btn>
+            );
+          })()}
         </div>
       </div>
     </div>

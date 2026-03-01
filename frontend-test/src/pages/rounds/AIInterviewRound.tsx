@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
-import { startRound, completeRound } from "../../services/pipeline";
+import { startRound, completeRound, getNextRoundPath, getNextRoundLabel } from "../../services/pipeline";
 
 const CANDIDATE = {
   name: "Arjun Mehta",
@@ -20,6 +20,8 @@ const AI_QUESTIONS = [
 
 export function AIInterviewRound() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const jobId = searchParams.get("jobId") || "";
   const [started, setStarted] = useState(false);
   const [currentQ, setCurrentQ] = useState(0);
   const [aiSpeaking, setAiSpeaking] = useState(false);
@@ -145,8 +147,14 @@ export function AIInterviewRound() {
             <Btn variant="secondary" onClick={() => navigate("/candidate-profile")}>
               Back to Profile
             </Btn>
-            <Btn onClick={() => { completeRound("ai-interview"); navigate("/round/technical-interview"); }}>
-              Next Round →
+            <Btn onClick={() => {
+              completeRound("ai-interview");
+              const next = getNextRoundPath(jobId, "ai_voice_interview");
+              navigate(next || "/candidate-profile");
+            }}>
+              {getNextRoundLabel(jobId, "ai_voice_interview")
+                ? `Next: ${getNextRoundLabel(jobId, "ai_voice_interview")} →`
+                : "Back to Profile"}
             </Btn>
           </div>
         </div>

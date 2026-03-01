@@ -10,6 +10,7 @@ import { Card, SectionLabel } from "../../assets/components/shared/Card";
 import { Tag } from "../../assets/components/shared/Badges";
 import { Btn } from "../../assets/components/shared/Btn";
 import { Avatar } from "../../assets/components/shared/Avatar";
+import { initJobPipeline, STAGE_ROUTE_MAP } from "../../services/pipeline";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -23,6 +24,7 @@ interface Opening {
   totalRounds: number;
   deadline: string | null;
   createdAt: string;
+  pipeline: string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -67,8 +69,22 @@ export function RecentOpenings() {
             totalRounds: j.totalRounds,
             deadline: j.deadline,
             createdAt: j.createdAt,
+            pipeline: j.pipeline || [],
           })),
         );
+
+        // Store each job's pipeline in localStorage for round navigation
+        jobs.forEach((j) => {
+          if (j.pipeline?.length) {
+            initJobPipeline(
+              j.id,
+              j.pipeline.map((stageType, idx) => ({
+                stageType,
+                order: idx + 1,
+              })),
+            );
+          }
+        });
       } catch (err) {
         if (!cancelled) {
           setFetchError(err instanceof Error ? err.message : "Failed to load jobs");
@@ -189,7 +205,12 @@ export function RecentOpenings() {
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((job) => {
-              const applyUrl = `/round/resume-screening?jobId=${job.id}&jobTitle=${encodeURIComponent(job.title)}`;
+              // Use the first stage of the job's pipeline, or fallback to resume-screening
+              const firstStage = job.pipeline?.[0];
+              const firstStagePath = firstStage
+                ? (STAGE_ROUTE_MAP[firstStage] || "/round/resume-screening")
+                : "/round/resume-screening";
+              const applyUrl = `${firstStagePath}?jobId=${job.id}&jobTitle=${encodeURIComponent(job.title)}`;
               return (
                 <Card key={job.id} hover onClick={() => navigate(applyUrl)}>
                   <div className="px-5 py-[18px]">

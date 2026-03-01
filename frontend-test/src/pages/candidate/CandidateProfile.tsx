@@ -12,6 +12,7 @@ import { Card, SectionLabel, Divider } from "../../assets/components/shared/Card
 import { Btn } from "../../assets/components/shared/Btn";
 import { Tag } from "../../assets/components/shared/Badges";
 import { Avatar } from "../../assets/components/shared/Avatar";
+import { initJobPipeline } from "../../services/pipeline";
 
 /* ------------------------------------------------------------------ */
 /*  Stage-type → path mapping for "Continue" buttons                   */
@@ -108,6 +109,14 @@ export function CandidateProfile() {
         if (me.skills.length > 0) setSkills(me.skills);
       }
       setApplications(apps.applications);
+
+      // Store each job's pipeline in localStorage so round pages
+      // can look up the correct next-round navigation.
+      apps.applications.forEach((app: MyApplication) => {
+        if (app.pipeline?.length) {
+          initJobPipeline(app.jobId, app.pipeline);
+        }
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load profile");
     } finally {

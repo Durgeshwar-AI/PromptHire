@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
 import { aptitudeApi, getStoredUser } from "../../services/api";
-import { startRound, completeRound } from "../../services/pipeline";
+import { startRound, completeRound, getNextRoundPath, getNextRoundLabel } from "../../services/pipeline";
 
 /* ── Fallback mock questions (used when backend is unavailable) ── */
 const MOCK_QUESTIONS = Array.from({ length: 25 }, (_, i) => {
@@ -254,7 +254,7 @@ export function AptitudeTestRound() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await aptitudeApi.getQuestions({ limit: 25, jobId: jobId || undefined });
+        const data: any = await aptitudeApi.getQuestions({ limit: 25, jobId: jobId || undefined });
         if (!cancelled && data.questions?.length) {
           setQuestions(
             (data.questions as ApiQuestion[]).map((q) => ({ id: q._id, q: q.text, opts: q.options })),
@@ -327,7 +327,7 @@ export function AptitudeTestRound() {
         questionId: q.id,
         selectedOption: answers[i] ?? -1,
       }));
-      const data = await aptitudeApi.submit({ jobId, candidateId, answers: apiAnswers });
+      const data: any = await aptitudeApi.submit({ jobId, candidateId, answers: apiAnswers });
       setResult({ totalScore: data.totalScore, maxScore: data.maxScore, percentage: data.percentage });
     } catch {
       const localScore = questions.reduce(
@@ -383,8 +383,12 @@ export function AptitudeTestRound() {
               {submitting ? "Submitting…" : "Submit Test"}
             </Btn>
           ) : (
-            <Btn size="sm" variant="secondary" onClick={() => { completeRound("aptitude"); navigate("/round/coding-challenge"); }}>
-              Next Round →
+            <Btn size="sm" variant="secondary" onClick={() => {
+              completeRound("aptitude");
+              const next = getNextRoundPath(jobId, "aptitude_test");
+              navigate(next || "/candidate-profile");
+            }}>
+              {getNextRoundLabel(jobId, "aptitude_test") ? `Next: ${getNextRoundLabel(jobId, "aptitude_test")} →` : "Back to Profile"}
             </Btn>
           )}
         </div>
@@ -408,8 +412,14 @@ export function AptitudeTestRound() {
               </div>
             </div>
             {(result?.percentage ?? 0) >= 70 && (
-              <Btn onClick={() => { completeRound("aptitude"); navigate("/round/coding-challenge"); }}>
-                Proceed to Coding Challenge →
+              <Btn onClick={() => {
+                completeRound("aptitude");
+                const next = getNextRoundPath(jobId, "aptitude_test");
+                navigate(next || "/candidate-profile");
+              }}>
+                {getNextRoundLabel(jobId, "aptitude_test")
+                  ? `Proceed to ${getNextRoundLabel(jobId, "aptitude_test")} →`
+                  : "Back to Profile"}
               </Btn>
             )}
           </div>
