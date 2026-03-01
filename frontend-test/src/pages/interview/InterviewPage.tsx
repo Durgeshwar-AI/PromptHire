@@ -102,15 +102,8 @@ export function InterviewPage() {
         "Is there anything else you'd like to share about your background or experience?",
       ];
 
-      // Let ElevenLabs handle mic access internally — do NOT call getUserMedia separately
-      const conversation = await Conversation.startSession({
+      const baseSessionConfig = {
         signedUrl,
-        overrides: {
-          agent: {
-            prompt: { prompt: systemPrompt },
-            firstMessage,
-          },
-        },
         clientTools: {
           fetch_candidate_context: () =>
             JSON.stringify({
@@ -145,33 +138,95 @@ export function InterviewPage() {
             return JSON.stringify({ status: "noted" });
           },
         },
-        onConnect: () => {
-          setConnecting(false);
-        },
-        onDisconnect: () => {
-          setEnded(true);
-          setShowReport(true);
-        },
-        onModeChange: ({ mode }) => {
-          setAgentSpeaking(mode === "speaking");
-          setUserSpeaking(mode === "listening");
-        },
-        onMessage: ({ message, source }) => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: source === "ai" ? "ai" : "candidate",
-              text: message,
-            },
-          ]);
-        },
-        onError: (err) => {
-          console.error("ElevenLabs error:", err);
-          setError(typeof err === "string" ? err : "Connection error");
-        },
-      });
+      };
 
-      conversationRef.current = conversation;
+      // Let ElevenLabs handle mic access internally — do NOT call getUserMedia separately
+      let conversation;
+      try {
+        conversation = await Conversation.startSession({
+          ...baseSessionConfig,
+          overrides: {
+            agent: {
+              prompt: { prompt: systemPrompt },
+              firstMessage,
+            },
+          },
+          onConnect: () => {
+            setConnecting(false);
+          },
+          onDisconnect: () => {
+            setEnded(true);
+            setShowReport(true);
+          },
+          onModeChange: ({ mode }) => {
+            setAgentSpeaking(mode === "speaking");
+            setUserSpeaking(mode === "listening");
+          },
+          onMessage: ({ message, source }) => {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: source === "ai" ? "ai" : "candidate",
+                text: message,
+              },
+            ]);
+          },
+          onError: (err) => {
+            console.error("ElevenLabs error:", err);
+            setError(typeof err === "string" ? err : "Connection error");
+          },
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message.toLowerCase() : "";
+        const firstMessageBlocked =
+          message.includes("first_message") && message.includes("not allowed");
+
+        if (!firstMessageBlocked) {
+          throw err;
+        }
+
+        // Agent config disallows overriding first_message. Retry without firstMessage.
+        conversation = await Conversation.startSession({
+          ...baseSessionConfig,
+          overrides: {
+            agent: {
+              prompt: { prompt: systemPrompt },
+            },
+          },
+          onConnect: () => {
+            setConnecting(false);
+          },
+          onDisconnect: () => {
+            setEnded(true);
+            setShowReport(true);
+          },
+          onModeChange: ({ mode }) => {
+            setAgentSpeaking(mode === "speaking");
+            setUserSpeaking(mode === "listening");
+          },
+          onMessage: ({ message, source }) => {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: source === "ai" ? "ai" : "candidate",
+                text: message,
+              },
+            ]);
+          },
+          onError: (innerErr) => {
+            console.error("ElevenLabs error:", innerErr);
+            setError(typeof innerErr === "string" ? innerErr : "Connection error");
+          },
+        });
+      }
+
+      if (!conversation) {
+        throw new Error("Failed to initialize conversation session");
+      }
+
+      const stableConversation = conversation;
+
+      conversationRef.current = stableConversation;
     } catch (err) {
       console.error("Failed to start interview session:", err);
       startedRef.current = false;
