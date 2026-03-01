@@ -86,8 +86,8 @@ export function InterviewPage() {
       setConnecting(true);
       setError(null);
 
-      // Get signed URL from our backend
-      const { signedUrl } = await interviewSessionApi.startSession(jobId);
+      // Get signed URL + prompt overrides from our backend
+      const { signedUrl, systemPrompt, firstMessage } = await interviewSessionApi.startSession(jobId);
 
       // Let ElevenLabs handle mic access internally — do NOT call getUserMedia separately
       const conversation = await Conversation.startSession({
@@ -169,7 +169,7 @@ export function InterviewPage() {
   if (showReport) return <ReportView jobId={jobId} />;
 
   return (
-    <div className="min-h-screen bg-[#0d0f14] flex flex-col overflow-hidden">
+    <div className="h-screen bg-[#0d0f14] flex flex-col overflow-hidden">
       {/* ── Top bar ─────────────────────────────────────────── */}
       <header className="h-[56px] bg-[#0d0f14] border-b border-white/[0.06] flex items-center justify-between px-7 shrink-0">
         <div className="flex items-center gap-4">
@@ -208,9 +208,9 @@ export function InterviewPage() {
       )}
 
       {/* ── Main content ────────────────────────────────────── */}
-      <div className="flex-1 grid grid-cols-[1fr_380px] overflow-hidden">
+      <div className="flex-1 min-h-0 grid grid-cols-[1fr_380px] overflow-hidden">
         {/* Left — Interview stage */}
-        <div className="flex flex-col items-center justify-center p-10 gap-6 relative">
+        <div className="flex flex-col items-center justify-center p-10 gap-6 relative overflow-hidden">
           {/* Subtle radial gradient behind avatar */}
           <div
             className="absolute inset-0 pointer-events-none"
@@ -286,7 +286,7 @@ export function InterviewPage() {
                   : "bg-white/[0.05] border-2 border-white/10 hover:bg-white/[0.08]",
               ].join(" ")}
             >
-              {muted ? "" : ""}
+              {muted ? "\uD83D\uDD07" : "\uD83C\uDF99\uFE0F"}
             </button>
 
             <button
@@ -309,7 +309,7 @@ export function InterviewPage() {
         </div>
 
         {/* Right — transcript panel */}
-        <div className="flex flex-col bg-white/[0.02] border-l border-white/[0.06]">
+        <div className="flex flex-col min-h-0 bg-white/[0.02] border-l border-white/[0.06]">
           {/* Panel header */}
           <div className="py-3.5 px-5 border-b border-white/[0.06] flex items-center justify-between">
             <span className="font-display font-extrabold text-[10px] text-white/40 tracking-[0.18em] uppercase">
