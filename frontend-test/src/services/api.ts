@@ -286,6 +286,9 @@ export const interviewSessionApi = {
       signedUrl: string;
       agentId: string;
       interviewId: string;
+      systemPrompt: string;
+      firstMessage: string;
+      questionCount: number;
       metadata: Record<string, string>;
     }>("/interview/token", {
       method: "POST",
