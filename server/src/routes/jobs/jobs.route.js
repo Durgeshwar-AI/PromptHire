@@ -76,7 +76,7 @@ router.post("/", authenticateHR, async (req, res) => {
 router.get("/", authenticateHR, async (req, res) => {
   try {
     const { status } = req.query;
-    const filter = {};
+    const filter = { createdBy: req.hrUser.id };
     if (status) filter.status = status;
 
     const jobs = await JobRole.find(filter)

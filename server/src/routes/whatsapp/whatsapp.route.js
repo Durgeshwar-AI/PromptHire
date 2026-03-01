@@ -3,13 +3,52 @@ import HRUser from "../../models/HRUser.model.js";
 import JobRole, { STAGE_TYPES } from "../../models/JobRole.model.js";
 import InterviewProgress from "../../models/InterviewProgress.model.js";
 import ScreeningCandidate from "../../models/candidate.screening.model.js";
-import { handleWhatsAppJobCommand } from "../../services/whatsappJobCreator.service.js";
+import { createJobFromParsed } from "../../services/whatsappJobCreator.service.js";
 import {
   autoSchedulePipeline,
   processFailedCandidates,
 } from "../../services/pipelineScheduler.service.js";
 
 const router = express.Router();
+
+// ─── In-memory conversation state for multi-step CREATE JOB ──────
+// Key: chatId → { step, data, hrId, expiresAt }
+const conversations = new Map();
+const CONVERSATION_TTL = 10 * 60 * 1000; // 10 minutes
+
+function getConversation(chatId) {
+  const conv = conversations.get(chatId);
+  if (!conv) return null;
+  if (Date.now() > conv.expiresAt) {
+    conversations.delete(chatId);
+    return null;
+  }
+  return conv;
+}
+
+function setConversation(chatId, step, data, hrId) {
+  conversations.set(chatId, {
+    step,
+    data,
+    hrId,
+    expiresAt: Date.now() + CONVERSATION_TTL,
+  });
+}
+
+function clearConversation(chatId) {
+  conversations.delete(chatId);
+}
+
+// Clean up expired conversations every 5 minutes
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [chatId, conv] of conversations) {
+      if (now > conv.expiresAt) conversations.delete(chatId);
+    }
+  },
+  5 * 60 * 1000,
+);
 
 // ─── Prefix trigger keyword ──────────────────────────────────────
 const TRIGGER_KEYWORD = (
@@ -71,29 +110,223 @@ async function sendTelegramReply(chatId, text) {
 
 // ── Command handlers ─────────────────────────────────────────────
 
+// ── Stage icons for pretty summaries ────────────────────────────
+const STAGE_ICONS = {
+  resume_screening: "📄",
+  aptitude_test: "🧠",
+  coding_challenge: "💻",
+  ai_voice_interview: "🎙️",
+  technical_interview: "⚙️",
+  custom_round: "🛠️",
+};
+
 async function handleHelp(chatId) {
   await sendTelegramReply(
     chatId,
-    `🤖 *AgenticHire Bot Commands*\n\n` +
-      `📋 *CREATE JOB* <description>\n` +
-      `   AI parses title, skills, deadline, pipeline.\n` +
-      `   Creates job + full pipeline + auto-schedules dates.\n` +
-      `   _Ex: CREATE JOB Senior React Eng, deadline April 30, top 5_\n` +
-      `   _Ex: CREATE JOB ML Engineer, skills: Python TensorFlow, rounds: resume, coding, technical_\n\n` +
-      `🔧 *ADD PIPELINE* <job\\_id> stages: <s1, s2, ...>\n` +
-      `   Override pipeline for an existing job.\n` +
-      `   Stages: resume, aptitude, coding, ai, technical, custom\n` +
-      `   _Ex: ADD PIPELINE 663abc stages: resume, aptitude, technical_\n\n` +
-      `📅 *SCHEDULE* <job\\_id>\n` +
-      `   Re-schedule dates if you changed the pipeline.\n\n` +
-      `📊 *STATUS* <job\\_id>\n` +
-      `   Shows pipeline, dates, and per-stage candidate counts.\n\n` +
-      `✅ *SHORTLIST* <job\\_id> stage <n>\n` +
-      `   Removes candidates who failed stage N.\n\n` +
+    `🚀 *PromptHire — Telegram Command Center*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `📋 *CREATE JOB* \`<title>\`\n` +
+      `   Starts an interactive flow — the bot will ask you for:\n` +
+      `   description → skills → deadline → pipeline stages\n` +
+      `   ▸ _CREATE JOB Senior React Engineer_\n` +
+      `   ▸ _CREATE JOB ML Engineer_\n` +
+      `   Send *CANCEL* anytime to abort.\n\n` +
+      `🔧 *ADD PIPELINE* \`<job_id>\` stages: \`<s1, s2, …>\`\n` +
+      `   Override or set pipeline stages for a job.\n` +
+      `   Available: resume · aptitude · coding · ai · technical · custom\n` +
+      `   ▸ _ADD PIPELINE 663abc stages: resume, aptitude, technical_\n\n` +
+      `📅 *SCHEDULE* \`<job_id>\`\n` +
+      `   Auto-assign dates after creating or editing a pipeline.\n\n` +
+      `📊 *STATUS* \`<job_id>\`\n` +
+      `   View pipeline, scheduled dates & per-stage candidate stats.\n\n` +
+      `✅ *SHORTLIST* \`<job_id>\` stage \`<n>\`\n` +
+      `   Eliminate candidates who failed stage N; advance the rest.\n\n` +
       `📃 *LIST JOBS*\n` +
-      `   Shows all active job openings.\n\n` +
-      `❓ */help* — shows this menu`,
+      `   Browse all active job openings (up to 10).\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `💡 *Quick tip:* Start with *CREATE JOB*, then *STATUS* to track.\n` +
+      `Type */help* anytime to see this menu.`,
   );
+}
+
+// ── Multi-step CREATE JOB conversation handler ───────────────────
+
+async function handleCreateJobStep(chatId, rawText, hrId) {
+  const upper = rawText.toUpperCase();
+
+  // Cancel at any point
+  if (upper === "CANCEL" || upper === "/CANCEL") {
+    clearConversation(chatId);
+    await sendTelegramReply(chatId, `❌ Job creation cancelled.`);
+    return;
+  }
+
+  const conv = getConversation(chatId);
+  if (!conv) return; // Should not happen, caller checks
+
+  const { step, data } = conv;
+
+  if (step === "awaiting_description") {
+    data.description = rawText.trim();
+    setConversation(chatId, "awaiting_skills", data, hrId);
+    await sendTelegramReply(
+      chatId,
+      `✅ *Description saved.*\n\n` +
+        `🔧 *Step 3/5 — Skills*\n` +
+        `Send the required skills, comma-separated.\n\n` +
+        `▸ _React, TypeScript, Node.js, MongoDB_\n` +
+        `▸ Or send *skip* to auto-detect later.`,
+    );
+    return;
+  }
+
+  if (step === "awaiting_skills") {
+    if (upper !== "SKIP") {
+      data.skills = rawText
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    } else {
+      data.skills = [];
+    }
+    setConversation(chatId, "awaiting_deadline", data, hrId);
+    await sendTelegramReply(
+      chatId,
+      `✅ *Skills saved:* ${data.skills.length ? data.skills.join(", ") : "_(will be auto-detected)_"}\n\n` +
+        `📅 *Step 4/5 — Submission Deadline*\n` +
+        `When should applications close?\n\n` +
+        `▸ _April 30, 2026_\n` +
+        `▸ _2026-04-30_\n` +
+        `▸ Or send *skip* for default (14 days from now).`,
+    );
+    return;
+  }
+
+  if (step === "awaiting_deadline") {
+    if (upper !== "SKIP") {
+      const parsed = new Date(rawText.trim());
+      if (isNaN(parsed.getTime())) {
+        await sendTelegramReply(
+          chatId,
+          `❌ Could not parse that date. Try a format like _April 30, 2026_ or _2026-04-30_.\nOr send *skip*.`,
+        );
+        return;
+      }
+      data.submissionDeadline = parsed.toISOString();
+    } else {
+      const deadline = new Date();
+      deadline.setDate(deadline.getDate() + 14);
+      data.submissionDeadline = deadline.toISOString();
+    }
+    setConversation(chatId, "awaiting_pipeline", data, hrId);
+    await sendTelegramReply(
+      chatId,
+      `✅ *Deadline:* ${new Date(data.submissionDeadline).toDateString()}\n\n` +
+        `📋 *Step 5/5 — Pipeline Stages*\n` +
+        `Send the hiring stages in order, comma-separated:\n\n` +
+        `Available stages:\n` +
+        `  📄 \`resume\` — Resume Screening\n` +
+        `  🧠 \`aptitude\` — Aptitude Test\n` +
+        `  💻 \`coding\` — Coding Challenge\n` +
+        `  🎙️ \`ai\` — AI Voice Interview\n` +
+        `  ⚙️ \`technical\` — Technical Interview\n` +
+        `  🛠️ \`custom\` — Custom Round\n\n` +
+        `▸ _resume, aptitude, coding, technical_\n` +
+        `▸ _resume, coding, ai_`,
+    );
+    return;
+  }
+
+  if (step === "awaiting_pipeline") {
+    const rawStages = rawText.split(",").map((s) => s.trim());
+    const pipeline = rawStages
+      .map((s, idx) => {
+        const stageType = resolveStage(s);
+        if (!stageType) return null;
+        const STAGE_NAMES = {
+          resume_screening: "Resume Screening",
+          aptitude_test: "Aptitude Test",
+          coding_challenge: "Coding Challenge",
+          ai_voice_interview: "AI Voice Interview",
+          technical_interview: "Technical Interview",
+          custom_round: "Custom Round",
+        };
+        return {
+          stageType,
+          stageName: STAGE_NAMES[stageType] || stageType.replace(/_/g, " "),
+          order: idx + 1,
+          thresholdScore: 60,
+          daysAfterPrev: 3,
+        };
+      })
+      .filter(Boolean);
+
+    if (!pipeline.length) {
+      await sendTelegramReply(
+        chatId,
+        `❌ No valid stages found. Valid: resume, aptitude, coding, ai, technical, custom\nTry again or send *CANCEL*.`,
+      );
+      return;
+    }
+
+    data.pipeline = pipeline;
+    data.totalRounds = pipeline.length;
+    data.topN = data.topN || 5;
+    clearConversation(chatId);
+
+    // ── Create the job ────────────────────────────────────────
+    try {
+      const { job } = await createJobFromParsed(data, hrId);
+
+      // Auto-schedule pipeline dates
+      let scheduledJob = job;
+      if (job.pipeline?.length > 0) {
+        try {
+          await autoSchedulePipeline(job, job.submissionDeadline);
+          scheduledJob = await JobRole.findById(job._id);
+        } catch (schedErr) {
+          console.warn("[JobCreator] Auto-schedule failed:", schedErr.message);
+        }
+      }
+
+      // Build summary
+      const deadline = scheduledJob.submissionDeadline
+        ? scheduledJob.submissionDeadline.toDateString()
+        : "Not set";
+
+      const pipelineLines =
+        scheduledJob.pipeline
+          ?.sort((a, b) => a.order - b.order)
+          .map((s) => {
+            const icon = STAGE_ICONS[s.stageType] || "▪️";
+            const name = s.stageName || s.stageType.replace(/_/g, " ");
+            const date = s.scheduledDate
+              ? new Date(s.scheduledDate).toDateString()
+              : "TBD";
+            return `  ${icon} ${s.order}. ${name} — ${date}`;
+          })
+          .join("\n") || "  None";
+
+      await sendTelegramReply(
+        chatId,
+        `✅ *Job Created & Pipeline Deployed!*\n\n` +
+          `*Title:* ${scheduledJob.title}\n` +
+          `*Description:* ${scheduledJob.description || "—"}\n` +
+          `*Skills:* ${scheduledJob.skills?.join(", ") || "N/A"}\n` +
+          `*Deadline:* ${deadline}\n\n` +
+          `📋 *Hiring Pipeline (${scheduledJob.pipeline?.length ?? 0} stages):*\n${pipelineLines}\n\n` +
+          `*Job ID:* \`${scheduledJob._id}\`\n` +
+          `*Status:* ${scheduledJob.status} | *Scheduling:* ✅ Done`,
+      );
+    } catch (createErr) {
+      console.error("[Telegram] Job creation error:", createErr.message);
+      await sendTelegramReply(
+        chatId,
+        `❌ Failed to create job: ${createErr.message}`,
+      );
+    }
+    return;
+  }
 }
 
 async function handleAddPipeline(chatId, rawText) {
@@ -330,6 +563,52 @@ router.post("/webhook", async (req, res) => {
 
     const createdByHRId = hrUser?._id?.toString() || fallbackHRId;
 
+    // ── Check if we're mid-conversation (multi-step CREATE JOB) ──
+    const activeConv = getConversation(chatId);
+    if (activeConv && upper !== "CANCEL" && upper !== "/CANCEL") {
+      // If user typed a different command mid-conversation, warn them
+      const isCommand =
+        upper.startsWith("/") ||
+        upper.startsWith("CREATE JOB") ||
+        upper === "HELP" ||
+        upper.startsWith("LIST") ||
+        upper.startsWith("ADD PIPELINE") ||
+        upper.startsWith("SCHEDULE") ||
+        upper.startsWith("STATUS") ||
+        upper.startsWith("SHORTLIST");
+      if (isCommand) {
+        await sendTelegramReply(
+          chatId,
+          `⚠️ You have an active job creation in progress (*${activeConv.data.title}*).\n\n` +
+            `Send your response to continue, or send *CANCEL* to abort it first.`,
+        );
+        return;
+      }
+      // Continue the conversation
+      try {
+        await handleCreateJobStep(chatId, rawText, createdByHRId);
+      } catch (stepErr) {
+        console.error("[Telegram] Conversation step error:", stepErr.message);
+        clearConversation(chatId);
+        await sendTelegramReply(
+          chatId,
+          `❌ Error: ${stepErr.message}\nJob creation aborted. Send /help for usage.`,
+        );
+      }
+      return;
+    }
+
+    // Handle CANCEL even outside conversation
+    if (upper === "CANCEL" || upper === "/CANCEL") {
+      if (activeConv) {
+        clearConversation(chatId);
+        await sendTelegramReply(chatId, `❌ Job creation cancelled.`);
+      } else {
+        await sendTelegramReply(chatId, `ℹ️ Nothing to cancel.`);
+      }
+      return;
+    }
+
     try {
       if (
         upper === "/HELP" ||
@@ -375,24 +654,35 @@ router.post("/webhook", async (req, res) => {
         upper.startsWith("/CREATE_JOB") ||
         upper.startsWith("/CREATEJOB")
       ) {
-        const command = rawText
+        const title = rawText
           .replace(/^\/create_?job\s*/i, "")
           .replace(new RegExp(`^${TRIGGER_KEYWORD}\\s*`, "i"), "")
           .trim();
-        if (!command) {
+        if (!title) {
           await sendTelegramReply(
             chatId,
-            `Describe the job after the command.\n` +
-              `Example: *CREATE JOB* Senior React Eng, deadline April 30, top 5, skills: React TS\n\n` +
-              `Send /help to see all commands.`,
+            `📋 *CREATE JOB* needs a job title.\n\n` +
+              `▸ _CREATE JOB Senior React Engineer_\n` +
+              `▸ _CREATE JOB ML Engineer_\n\n` +
+              `The bot will then ask you step-by-step for description, skills, deadline & pipeline.`,
           );
           return;
         }
-        const { summary } = await handleWhatsAppJobCommand(
-          command,
+        // Start interactive conversation
+        setConversation(
+          chatId,
+          "awaiting_description",
+          { title },
           createdByHRId,
         );
-        await sendTelegramReply(chatId, summary);
+        await sendTelegramReply(
+          chatId,
+          `✅ *Job title:* ${title}\n\n` +
+            `📝 *Step 2/5 — Job Description*\n` +
+            `Send the full job description now.\n\n` +
+            `▸ _We are looking for a senior engineer with 3+ years of React experience…_\n\n` +
+            `Send *CANCEL* anytime to abort.`,
+        );
       } else {
         await sendTelegramReply(
           chatId,
@@ -420,11 +710,9 @@ router.post("/setup", async (req, res) => {
     return res.status(400).json({ error: "TELEGRAM_BOT_TOKEN not set" });
   }
   if (!webhookUrl) {
-    return res
-      .status(400)
-      .json({
-        error: "Provide webhookUrl in body or set TELEGRAM_WEBHOOK_URL env var",
-      });
+    return res.status(400).json({
+      error: "Provide webhookUrl in body or set TELEGRAM_WEBHOOK_URL env var",
+    });
   }
 
   try {
