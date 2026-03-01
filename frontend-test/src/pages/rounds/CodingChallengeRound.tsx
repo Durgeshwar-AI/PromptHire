@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
 import { codingApi, getStoredUser } from "../../services/api";
-import { startRound, completeRound } from "../../services/pipeline";
+import { startRound, completeRound, getNextRoundPath } from "../../services/pipeline";
 
 type CodingProblem = {
   _id?: string;
@@ -228,10 +228,8 @@ export function CodingChallengeRound() {
     } catch { /* proceed anyway */ }
     setFinishing(false);
     completeRound("coding");
-    const params = new URLSearchParams();
-    if (jobId) params.set("jobId", jobId);
-    const qs = params.toString();
-    navigate(`/interview-entry${qs ? `?${qs}` : ""}`);
+    const next = getNextRoundPath(jobId, "coding_challenge");
+    navigate(next || "/candidate-profile");
   };
 
   return (

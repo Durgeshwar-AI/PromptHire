@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
 import { technicalApi, getStoredUser } from "../../services/api";
-import { startRound, completeRound } from "../../services/pipeline";
+import { startRound, completeRound, getNextRoundPath, getNextRoundLabel } from "../../services/pipeline";
 
 /* ── Fallback mock questions ── */
 const MOCK_QUESTIONS = Array.from({ length: 25 }, (_, i) => {
@@ -300,7 +300,7 @@ export function TechnicalInterviewRound() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await technicalApi.getQuestions({ limit: 25, jobId: jobId || undefined });
+        const data: any = await technicalApi.getQuestions({ limit: 25, jobId: jobId || undefined });
         if (!cancelled && data.questions?.length) {
           setQuestions(
             (data.questions as ApiQuestion[]).map((q) => ({ id: q._id, q: q.text, opts: q.options })),
@@ -375,7 +375,7 @@ export function TechnicalInterviewRound() {
         questionId: q.id,
         selectedOption: answers[i] ?? -1,
       }));
-      const data = await technicalApi.submit({ jobId, candidateId, answers: apiAnswers });
+      const data: any = await technicalApi.submit({ jobId, candidateId, answers: apiAnswers });
       setResult({ totalScore: data.totalScore, maxScore: data.maxScore, percentage: data.percentage });
     } catch {
       const localScore = questions.reduce(
@@ -431,8 +431,12 @@ export function TechnicalInterviewRound() {
               {submitting ? "Submitting…" : "Submit Test"}
             </Btn>
           ) : (
-            <Btn size="sm" variant="secondary" onClick={() => navigate("/candidate-profile")}>
-              Back to Profile
+            <Btn size="sm" variant="secondary" onClick={() => {
+              completeRound("technical");
+              const next = getNextRoundPath(jobId, "technical_interview");
+              navigate(next || "/candidate-profile");
+            }}>
+              {getNextRoundLabel(jobId, "technical_interview") ? `Next: ${getNextRoundLabel(jobId, "technical_interview")} →` : "Back to Profile"}
             </Btn>
           )}
         </div>
@@ -454,8 +458,14 @@ export function TechnicalInterviewRound() {
                 {(result?.percentage ?? 0) >= 70 ? "✅  Congratulations! You've completed all rounds." : "❌  Not selected"}
               </div>
             </div>
-            <Btn onClick={() => { completeRound("technical"); navigate("/candidate-profile"); }}>
-              Back to Profile
+            <Btn onClick={() => {
+              completeRound("technical");
+              const next = getNextRoundPath(jobId, "technical_interview");
+              navigate(next || "/candidate-profile");
+            }}>
+              {getNextRoundLabel(jobId, "technical_interview")
+                ? `Proceed to ${getNextRoundLabel(jobId, "technical_interview")} →`
+                : "Back to Profile"}
             </Btn>
           </div>
         </div>

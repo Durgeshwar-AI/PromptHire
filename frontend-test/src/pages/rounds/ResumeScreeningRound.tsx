@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Btn } from "../../assets/components/shared/Btn";
 import { Card } from "../../assets/components/shared/Card";
 import { resumeApi, getStoredUser } from "../../services/api";
-import { startRound, completeRound } from "../../services/pipeline";
+import { startRound, completeRound, getNextRoundPath, getNextRoundLabel } from "../../services/pipeline";
 
 /* ── mock resume data pulled from "profile" ── */
 const PROFILE_RESUME = {
@@ -22,6 +22,7 @@ export function ResumeScreeningRound() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const candidateId = searchParams.get("candidateId") || getStoredUser()?._id || "";
+  const jobId = searchParams.get("jobId") || "";
   const jobTitle = searchParams.get("jobTitle") || PROFILE_RESUME.role;
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<Result>(null);
@@ -48,7 +49,7 @@ export function ResumeScreeningRound() {
           setPhase("analysing");
           (async () => {
             try {
-              const data = await resumeApi.screenExisting(candidateId, {
+              const data: any = await resumeApi.screenExisting(candidateId, {
                 jobTitle,
                 jobDescription: `Screening for ${jobTitle}`,
               });
@@ -240,8 +241,14 @@ export function ResumeScreeningRound() {
               {/* Next step */}
               {result.selected && (
                 <div className="flex justify-end">
-                  <Btn onClick={() => { completeRound("resume"); navigate("/round/aptitude-test"); }}>
-                    Proceed to Aptitude Test →
+                  <Btn onClick={() => {
+                    completeRound("resume");
+                    const next = getNextRoundPath(jobId, "resume_screening");
+                    navigate(next || "/candidate-profile");
+                  }}>
+                    {getNextRoundLabel(jobId, "resume_screening")
+                      ? `Proceed to ${getNextRoundLabel(jobId, "resume_screening")} →`
+                      : "Back to Profile"}
                   </Btn>
                 </div>
               )}
