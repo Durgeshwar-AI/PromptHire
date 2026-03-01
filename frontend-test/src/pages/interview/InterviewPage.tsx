@@ -92,6 +92,12 @@ export function InterviewPage() {
       // Let ElevenLabs handle mic access internally — do NOT call getUserMedia separately
       const conversation = await Conversation.startSession({
         signedUrl,
+        overrides: {
+          agent: {
+            prompt: { prompt: systemPrompt },
+            firstMessage,
+          },
+        },
         onConnect: () => {
           setConnecting(false);
         },
@@ -280,7 +286,7 @@ export function InterviewPage() {
                   : "bg-white/[0.05] border-2 border-white/10 hover:bg-white/[0.08]",
               ].join(" ")}
             >
-              {muted ? "🔇" : "🎙️"}
+              {muted ? "" : ""}
             </button>
 
             <button

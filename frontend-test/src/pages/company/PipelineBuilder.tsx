@@ -6,7 +6,22 @@ import { Btn } from "../../assets/components/shared/Btn";
 import { ROUNDS } from "../../constants/data";
 import { jobsApi } from "../../services/api";
 
-type PipelineRound = (typeof ROUNDS)[number];
+type Difficulty = "Easy" | "Medium" | "Hard";
+type PipelineRound = (typeof ROUNDS)[number] & { difficulty?: Difficulty };
+
+// Rounds that support difficulty selection
+const DIFFICULTY_ROUNDS = new Set([
+  "aptitude_test",
+  "coding_challenge",
+  "ai_voice_interview",
+  "technical_interview",
+]);
+const DIFFICULTIES: Difficulty[] = ["Easy", "Medium", "Hard"];
+const DIFFICULTY_COLORS: Record<Difficulty, string> = {
+  Easy: "bg-green-100 text-green-700 border-green-300",
+  Medium: "bg-yellow-100 text-yellow-700 border-yellow-300",
+  Hard: "bg-red-100 text-red-700 border-red-300",
+};
 
 /* ── Drag hook ── */
 function useDragSort(setItems: Dispatch<SetStateAction<PipelineRound[]>>) {
@@ -71,6 +86,7 @@ function Connector() {
 export function PipelineBuilder() {
   const [pipeline, setPipeline] = useState<PipelineRound[]>([]);
   const [jobTitle, setJobTitle] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
   const [tab, setTab] = useState("builder");
   const [loading, setLoading] = useState(false);
   const [deployed, setDeployed] = useState(false);
@@ -79,7 +95,10 @@ export function PipelineBuilder() {
 
   const addRound = (r: PipelineRound) => {
     // Repeats ARE allowed — just push another copy
-    setPipeline((p) => [...p, r]);
+    const withDifficulty = DIFFICULTY_ROUNDS.has(r.id)
+      ? { ...r, difficulty: "Medium" as Difficulty }
+      : r;
+    setPipeline((p) => [...p, withDifficulty]);
     setTimeout(
       () => flowRef.current?.scrollTo({ top: 9999, behavior: "smooth" }),
       80,
@@ -87,7 +106,15 @@ export function PipelineBuilder() {
   };
   const removeRound = (idx: number) =>
     setPipeline((p) => p.filter((_, i) => i !== idx));
-  const canDeploy = !!jobTitle.trim() && pipeline.length > 0 && !loading;
+  const setDifficulty = (idx: number, diff: Difficulty) =>
+    setPipeline((p) =>
+      p.map((r, i) => (i === idx ? { ...r, difficulty: diff } : r)),
+    );
+  const canDeploy =
+    !!jobTitle.trim() &&
+    !!jobDescription.trim() &&
+    pipeline.length > 0 &&
+    !loading;
 
   const deploy = async () => {
     if (!canDeploy) return;
@@ -95,13 +122,14 @@ export function PipelineBuilder() {
     try {
       await jobsApi.create({
         title: jobTitle.trim(),
-        description: `Hiring pipeline: ${pipeline.map((r) => r.label).join(" → ")}`,
+        description: jobDescription.trim(),
         totalRounds: pipeline.length,
         // Send full pipeline with stageType so backend can save it
         pipeline: pipeline.map((r, i) => ({
           stageType: r.id, // ROUNDS[].id === stageType
           stageName: r.label,
           order: i + 1,
+          ...(r.difficulty ? { difficulty: r.difficulty } : {}),
           thresholdScore: 60,
           daysAfterPrev: 3,
         })),
@@ -127,32 +155,41 @@ export function PipelineBuilder() {
         </h1>
       </div>
 
-      {/* Title + tabs */}
-      <div className="fade-up flex items-center gap-3 pb-5 border-b border-border-clr flex-wrap mb-6">
-        <input
-          type="text"
-          placeholder="JOB TITLE — e.g. Senior Backend Engineer"
-          value={jobTitle}
-          onChange={(e) => setJobTitle(e.target.value)}
-          className="flex-1 min-w-[200px] bg-surface border-2 border-secondary py-[11px] px-3.5 text-[13px] text-secondary font-display font-bold tracking-[0.05em] uppercase outline-none focus:border-primary"
+      {/* Title + Description + tabs */}
+      <div className="fade-up flex flex-col gap-3 pb-5 border-b border-border-clr mb-6">
+        <div className="flex items-center gap-3 flex-wrap">
+          <input
+            type="text"
+            placeholder="JOB TITLE — e.g. Senior Backend Engineer"
+            value={jobTitle}
+            onChange={(e) => setJobTitle(e.target.value)}
+            className="flex-1 min-w-[200px] bg-surface border-2 border-secondary py-[11px] px-3.5 text-[13px] text-secondary font-display font-bold tracking-[0.05em] uppercase outline-none focus:border-primary"
+          />
+          {[
+            { k: "builder", l: "BUILDER" },
+            { k: "json", l: "{ } JSON" },
+          ].map((t) => (
+            <button
+              key={t.k}
+              onClick={() => setTab(t.k)}
+              className={[
+                "px-5 py-2.5 text-xs font-display font-extrabold tracking-[0.1em] cursor-pointer border-2 border-secondary transition-colors",
+                tab === t.k
+                  ? "bg-secondary text-white"
+                  : "bg-transparent text-secondary",
+              ].join(" ")}
+            >
+              {t.l}
+            </button>
+          ))}
+        </div>
+        <textarea
+          placeholder="JOB DESCRIPTION — Describe the role, responsibilities, requirements…"
+          value={jobDescription}
+          onChange={(e) => setJobDescription(e.target.value)}
+          rows={3}
+          className="w-full bg-surface border-2 border-secondary py-[11px] px-3.5 text-[13px] text-secondary font-body outline-none focus:border-primary resize-y min-h-[70px]"
         />
-        {[
-          { k: "builder", l: "BUILDER" },
-          { k: "json", l: "{ } JSON" },
-        ].map((t) => (
-          <button
-            key={t.k}
-            onClick={() => setTab(t.k)}
-            className={[
-              "px-5 py-2.5 text-xs font-display font-extrabold tracking-[0.1em] cursor-pointer border-2 border-secondary transition-colors",
-              tab === t.k
-                ? "bg-secondary text-white"
-                : "bg-transparent text-secondary",
-            ].join(" ")}
-          >
-            {t.l}
-          </button>
-        ))}
       </div>
 
       {/* Drag hint */}
@@ -290,12 +327,33 @@ export function PipelineBuilder() {
                         <div className="text-[10px] text-ink-faint font-body mt-px">
                           {round.duration}
                         </div>
+                        {DIFFICULTY_ROUNDS.has(round.id) && (
+                          <div className="flex gap-1 mt-1.5">
+                            {DIFFICULTIES.map((d) => (
+                              <button
+                                key={d}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDifficulty(i, d);
+                                }}
+                                className={[
+                                  "px-2 py-[1px] text-[9px] font-display font-bold tracking-[0.08em] uppercase border cursor-pointer transition-all",
+                                  round.difficulty === d
+                                    ? DIFFICULTY_COLORS[d]
+                                    : "bg-transparent text-ink-faint border-border-clr hover:border-secondary",
+                                ].join(" ")}
+                              >
+                                {d}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => removeRound(i)}
                         className="bg-transparent border border-border-clr text-ink-faint w-6 h-6 cursor-pointer text-[11px] flex items-center justify-center"
                       >
-                        ✕
+                        
                       </button>
                     </div>
                   </div>
@@ -306,7 +364,7 @@ export function PipelineBuilder() {
                 <div className="flex flex-col items-center">
                   <Connector />
                   <div className="bg-primary text-white font-display font-extrabold text-[10px] tracking-[0.18em] uppercase px-[18px] py-1.5">
-                    ✓ HIRE DECISION
+                     HIRE DECISION
                   </div>
                 </div>
               )}
@@ -323,8 +381,8 @@ export function PipelineBuilder() {
                   {loading
                     ? "⟳ DEPLOYING…"
                     : deployed
-                      ? "✓ PIPELINE DEPLOYED"
-                      : "🚀 DEPLOY PIPELINE"}
+                      ? " PIPELINE DEPLOYED"
+                      : " DEPLOY PIPELINE"}
                 </Btn>
                 {deployed && (
                   <p className="text-center text-xs text-success mt-2 font-body">
@@ -354,6 +412,7 @@ export function PipelineBuilder() {
                   stageType: r.id,
                   stageName: r.label,
                   order: i + 1,
+                  ...(r.difficulty ? { difficulty: r.difficulty } : {}),
                   thresholdScore: 60,
                   daysAfterPrev: 3,
                 })),
