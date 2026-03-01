@@ -38,7 +38,7 @@ type BackendJob = {
   shortlistedCount?: number;
   status?: string;
   createdAt?: string;
-  pipeline?: string[];
+  pipeline?: Array<string | { stageType?: string; stageName?: string }>;
 };
 
 function ActivityFeed() {
@@ -131,7 +131,11 @@ function OpeningCard({ opening }: { opening: DashboardOpening }) {
         </div>
         <div className="flex gap-1.5 flex-wrap">
           {opening.pipeline.slice(0, 4).map((r: unknown, i: number) => {
-            const label = typeof r === "string" ? r : (r as { id?: string; label?: string })?.label ?? String(r);
+            const label =
+              typeof r === "string"
+                ? r
+                : ((r as { stageType?: string; stageName?: string })
+                    ?.stageType ?? String(r));
             return (
               <span
                 key={label + i}
@@ -154,7 +158,9 @@ function OpeningCard({ opening }: { opening: DashboardOpening }) {
 
 export function CompanyDashboard() {
   const navigate = useNavigate();
-  const [openings, setOpenings] = useState<DashboardOpening[]>(MOCK_OPENINGS as DashboardOpening[]);
+  const [openings, setOpenings] = useState<DashboardOpening[]>(
+    MOCK_OPENINGS as DashboardOpening[],
+  );
   const [stats, setStats] = useState(MOCK_STATS);
 
   /* Redirect to login if not authenticated */
@@ -175,25 +181,39 @@ export function CompanyDashboard() {
             jobs.map((j) => ({
               id: j._id,
               title: j.title,
-              department: j.description || "Engineering",
+              department:
+                typeof j.description === "string"
+                  ? j.description
+                  : "Engineering",
               applicants: j.applicantCount ?? 0,
               shortlisted: j.shortlistedCount ?? 0,
               status: j.status || "active",
-              posted: j.createdAt ? new Date(j.createdAt).toLocaleDateString() : "—",
-              pipeline: j.pipeline || ["resume_screening"],
+              posted: j.createdAt
+                ? new Date(j.createdAt).toLocaleDateString()
+                : "—",
+              pipeline: (j.pipeline || []).map((s) =>
+                typeof s === "string" ? s : s?.stageType || "unknown",
+              ),
             })),
           );
           setStats((prev) => ({
             ...prev,
-            activeOpenings: jobs.filter((j) => j.status === "active" || !j.status).length,
-            totalApplicants: jobs.reduce((sum, j) => sum + (j.applicantCount ?? 0), 0),
+            activeOpenings: jobs.filter(
+              (j) => j.status === "active" || !j.status,
+            ).length,
+            totalApplicants: jobs.reduce(
+              (sum, j) => sum + (j.applicantCount ?? 0),
+              0,
+            ),
           }));
         }
       } catch {
         /* keep mock data */
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
   return (
     <AppShell currentPage="dashboard">
@@ -268,27 +288,29 @@ export function CompanyDashboard() {
               </span>
             </div>
             <Card>
-              {MOCK_CANDIDATES.slice(0, 5).map((c: DashboardCandidate, i: number) => (
-                <div
-                  key={c.id}
-                  className={[
-                    "flex items-center gap-3 px-4 py-3",
-                    i < 4 ? "border-b border-border-clr" : "",
-                  ].join(" ")}
-                >
-                  <Avatar initials={c.avatar} size={36} rank={i + 1} />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-display font-extrabold text-sm uppercase text-secondary">
-                      {c.name}
+              {MOCK_CANDIDATES.slice(0, 5).map(
+                (c: DashboardCandidate, i: number) => (
+                  <div
+                    key={c.id}
+                    className={[
+                      "flex items-center gap-3 px-4 py-3",
+                      i < 4 ? "border-b border-border-clr" : "",
+                    ].join(" ")}
+                  >
+                    <Avatar initials={c.avatar} size={36} rank={i + 1} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-display font-extrabold text-sm uppercase text-secondary">
+                        {c.name}
+                      </div>
+                      <div className="text-[11px] text-ink-faint font-body truncate">
+                        {c.round}
+                      </div>
                     </div>
-                    <div className="text-[11px] text-ink-faint font-body truncate">
-                      {c.round}
-                    </div>
+                    <ScoreBadge score={c.score} />
+                    <StatusPill status={c.status} />
                   </div>
-                  <ScoreBadge score={c.score} />
-                  <StatusPill status={c.status} />
-                </div>
-              ))}
+                ),
+              )}
             </Card>
           </div>
 

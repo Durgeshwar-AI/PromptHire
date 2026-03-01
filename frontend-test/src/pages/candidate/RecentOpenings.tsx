@@ -36,7 +36,8 @@ function timeAgo(iso: string): string {
   if (days === 0) return "Today";
   if (days === 1) return "1 day ago";
   if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${Math.floor(days / 7)} week${Math.floor(days / 7) > 1 ? "s" : ""} ago`;
+  if (days < 30)
+    return `${Math.floor(days / 7)} week${Math.floor(days / 7) > 1 ? "s" : ""} ago`;
   return `${Math.floor(days / 30)} month${Math.floor(days / 30) > 1 ? "s" : ""} ago`;
 }
 
@@ -76,13 +77,24 @@ export function RecentOpenings() {
           jobs.map((j) => ({
             id: j.id,
             title: j.title,
-            company: j.company,
-            description: j.description,
-            skills: j.skills,
+            company:
+              typeof j.company === "string"
+                ? j.company
+                : String(j.company || "Company"),
+            description: typeof j.description === "string" ? j.description : "",
+            skills: Array.isArray(j.skills)
+              ? j.skills.map((s: unknown) =>
+                  typeof s === "string" ? s : String(s),
+                )
+              : [],
             totalRounds: j.totalRounds,
             deadline: j.deadline,
             createdAt: j.createdAt,
-            pipeline: j.pipeline || [],
+            pipeline: (j.pipeline || []).map((s: unknown) =>
+              typeof s === "string"
+                ? s
+                : (s as { stageType?: string })?.stageType || "unknown",
+            ),
           })),
         );
 
@@ -100,7 +112,9 @@ export function RecentOpenings() {
         });
       } catch (err) {
         if (!cancelled) {
-          setFetchError(err instanceof Error ? err.message : "Failed to load jobs");
+          setFetchError(
+            err instanceof Error ? err.message : "Failed to load jobs",
+          );
           setOpenings([]);
         }
       } finally {
@@ -108,7 +122,9 @@ export function RecentOpenings() {
       }
     };
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const q = search.toLowerCase();
@@ -132,14 +148,20 @@ export function RecentOpenings() {
           onClick={() => navigate("/")}
           className="font-display font-black text-xl text-secondary cursor-pointer select-none"
         >
-          HR<span className="text-primary">11</span>
-          <span className="bg-primary text-white text-[8px] px-1.5 py-px ml-1.5">AI</span>
+          Prompt<span className="text-primary">Hire</span>
         </div>
 
         <div className="flex items-center gap-3">
-          <Btn size="sm" variant="ghost" onClick={() => navigate("/candidate-profile")}>
+          <Btn
+            size="sm"
+            variant="ghost"
+            onClick={() => navigate("/candidate-profile")}
+          >
             <span className="inline-flex items-center gap-2">
-              <Avatar initials={((user?.name as string) || "U")[0].toUpperCase()} size={24} />
+              <Avatar
+                initials={((user?.name as string) || "U")[0].toUpperCase()}
+                size={24}
+              />
               <span className="hidden sm:inline normal-case font-body font-medium text-xs tracking-normal">
                 {userName || "Profile"}
               </span>
@@ -158,7 +180,7 @@ export function RecentOpenings() {
             Candidate Portal
           </p>
           <h1 className="font-display font-black text-[32px] uppercase text-secondary leading-tight">
-            Welcome back{userName ? `, ${userName.split(" ")[0]}` : ""} 
+            Welcome back{userName ? `, ${userName.split(" ")[0]}` : ""}
           </h1>
           <p className="mt-1.5 font-body text-sm text-ink-light">
             Browse the latest openings and apply with one click.
@@ -179,7 +201,12 @@ export function RecentOpenings() {
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
           </div>
         </div>
@@ -203,17 +230,25 @@ export function RecentOpenings() {
             <p className="font-display font-black text-xl uppercase text-secondary">
               Unable to load jobs
             </p>
-            <p className="font-body text-sm text-ink-faint mt-1 mb-4">{fetchError}</p>
-            <Btn size="sm" onClick={() => window.location.reload()}>Retry</Btn>
+            <p className="font-body text-sm text-ink-faint mt-1 mb-4">
+              {fetchError}
+            </p>
+            <Btn size="sm" onClick={() => window.location.reload()}>
+              Retry
+            </Btn>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-4xl mb-3"></div>
             <p className="font-display font-black text-xl uppercase text-secondary">
-              {openings.length === 0 ? "No open positions right now" : "No openings found"}
+              {openings.length === 0
+                ? "No open positions right now"
+                : "No openings found"}
             </p>
             <p className="font-body text-sm text-ink-faint mt-1">
-              {openings.length === 0 ? "Check back later for new opportunities." : "Try a different search term."}
+              {openings.length === 0
+                ? "Check back later for new opportunities."
+                : "Try a different search term."}
             </p>
           </div>
         ) : (
@@ -222,13 +257,15 @@ export function RecentOpenings() {
               // Use the first stage of the job's pipeline, or fallback to resume-screening
               const firstStage = job.pipeline?.[0];
               const firstStagePath = firstStage
-                ? (STAGE_ROUTE_MAP[firstStage] || "/round/resume-screening")
+                ? STAGE_ROUTE_MAP[firstStage] || "/round/resume-screening"
                 : "/round/resume-screening";
               const applyUrl = `${firstStagePath}?jobId=${job.id}&jobTitle=${encodeURIComponent(job.title)}`;
               const handleApply = (e?: React.MouseEvent) => {
                 e?.stopPropagation();
                 if (!hasResume) {
-                  alert("Please upload your resume on your profile before applying to jobs.");
+                  alert(
+                    "Please upload your resume on your profile before applying to jobs.",
+                  );
                   navigate("/candidate-profile");
                   return;
                 }
@@ -274,7 +311,8 @@ export function RecentOpenings() {
                     {/* Deadline */}
                     {job.deadline && (
                       <p className="font-body text-[11px] text-warning font-semibold mb-2">
-                        ⏰ Deadline: {new Date(job.deadline).toLocaleDateString()}
+                        ⏰ Deadline:{" "}
+                        {new Date(job.deadline).toLocaleDateString()}
                       </p>
                     )}
 
@@ -284,7 +322,9 @@ export function RecentOpenings() {
                         <Tag key={tag}>{tag}</Tag>
                       ))}
                       {job.skills.length > 4 && (
-                        <span className="font-body text-[10px] text-ink-faint">+{job.skills.length - 4}</span>
+                        <span className="font-body text-[10px] text-ink-faint">
+                          +{job.skills.length - 4}
+                        </span>
                       )}
                     </div>
 
