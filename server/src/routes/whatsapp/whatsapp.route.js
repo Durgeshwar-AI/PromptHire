@@ -74,25 +74,27 @@ async function sendTelegramReply(chatId, text) {
 async function handleHelp(chatId) {
   await sendTelegramReply(
     chatId,
-    `🤖 *AgenticHire Bot Commands*\n\n` +
-      `📋 *CREATE JOB* <description>\n` +
-      `   AI parses title, skills, deadline, pipeline.\n` +
-      `   Creates job + full pipeline + auto-schedules dates.\n` +
-      `   _Ex: CREATE JOB Senior React Eng, deadline April 30, top 5_\n` +
-      `   _Ex: CREATE JOB ML Engineer, skills: Python TensorFlow, rounds: resume, coding, technical_\n\n` +
-      `🔧 *ADD PIPELINE* <job\\_id> stages: <s1, s2, ...>\n` +
-      `   Override pipeline for an existing job.\n` +
-      `   Stages: resume, aptitude, coding, ai, technical, custom\n` +
-      `   _Ex: ADD PIPELINE 663abc stages: resume, aptitude, technical_\n\n` +
-      `📅 *SCHEDULE* <job\\_id>\n` +
-      `   Re-schedule dates if you changed the pipeline.\n\n` +
-      `📊 *STATUS* <job\\_id>\n` +
-      `   Shows pipeline, dates, and per-stage candidate counts.\n\n` +
-      `✅ *SHORTLIST* <job\\_id> stage <n>\n` +
-      `   Removes candidates who failed stage N.\n\n` +
+    `🚀 *PromptHire — Telegram Command Center*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `📋 *CREATE JOB* \`<description>\`\n` +
+      `   AI auto-extracts title, skills, deadline & pipeline.\n` +
+      `   ▸ _CREATE JOB Senior React Eng, deadline April 30, top 5_\n` +
+      `   ▸ _CREATE JOB ML Engineer, skills: Python TensorFlow, rounds: resume, coding, technical_\n\n` +
+      `🔧 *ADD PIPELINE* \`<job_id>\` stages: \`<s1, s2, …>\`\n` +
+      `   Override or set pipeline stages for a job.\n` +
+      `   Available: resume · aptitude · coding · ai · technical · custom\n` +
+      `   ▸ _ADD PIPELINE 663abc stages: resume, aptitude, technical_\n\n` +
+      `📅 *SCHEDULE* \`<job_id>\`\n` +
+      `   Auto-assign dates after creating or editing a pipeline.\n\n` +
+      `📊 *STATUS* \`<job_id>\`\n` +
+      `   View pipeline, scheduled dates & per-stage candidate stats.\n\n` +
+      `✅ *SHORTLIST* \`<job_id>\` stage \`<n>\`\n` +
+      `   Eliminate candidates who failed stage N; advance the rest.\n\n` +
       `📃 *LIST JOBS*\n` +
-      `   Shows all active job openings.\n\n` +
-      `❓ */help* — shows this menu`,
+      `   Browse all active job openings (up to 10).\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `💡 *Quick tip:* Start with *CREATE JOB*, then *STATUS* to track.\n` +
+      `Type */help* anytime to see this menu.`,
   );
 }
 
@@ -420,11 +422,9 @@ router.post("/setup", async (req, res) => {
     return res.status(400).json({ error: "TELEGRAM_BOT_TOKEN not set" });
   }
   if (!webhookUrl) {
-    return res
-      .status(400)
-      .json({
-        error: "Provide webhookUrl in body or set TELEGRAM_WEBHOOK_URL env var",
-      });
+    return res.status(400).json({
+      error: "Provide webhookUrl in body or set TELEGRAM_WEBHOOK_URL env var",
+    });
   }
 
   try {
