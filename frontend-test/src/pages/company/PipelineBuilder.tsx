@@ -71,6 +71,7 @@ function Connector() {
 export function PipelineBuilder() {
   const [pipeline, setPipeline] = useState<PipelineRound[]>([]);
   const [jobTitle, setJobTitle] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
   const [tab, setTab] = useState("builder");
   const [loading, setLoading] = useState(false);
   const [deployed, setDeployed] = useState(false);
@@ -87,7 +88,11 @@ export function PipelineBuilder() {
   };
   const removeRound = (idx: number) =>
     setPipeline((p) => p.filter((_, i) => i !== idx));
-  const canDeploy = !!jobTitle.trim() && pipeline.length > 0 && !loading;
+  const canDeploy =
+    !!jobTitle.trim() &&
+    !!jobDescription.trim() &&
+    pipeline.length > 0 &&
+    !loading;
 
   const deploy = async () => {
     if (!canDeploy) return;
@@ -95,7 +100,7 @@ export function PipelineBuilder() {
     try {
       await jobsApi.create({
         title: jobTitle.trim(),
-        description: `Hiring pipeline: ${pipeline.map((r) => r.label).join(" → ")}`,
+        description: jobDescription.trim(),
         totalRounds: pipeline.length,
         // Send full pipeline with stageType so backend can save it
         pipeline: pipeline.map((r, i) => ({
@@ -127,32 +132,41 @@ export function PipelineBuilder() {
         </h1>
       </div>
 
-      {/* Title + tabs */}
-      <div className="fade-up flex items-center gap-3 pb-5 border-b border-border-clr flex-wrap mb-6">
-        <input
-          type="text"
-          placeholder="JOB TITLE — e.g. Senior Backend Engineer"
-          value={jobTitle}
-          onChange={(e) => setJobTitle(e.target.value)}
-          className="flex-1 min-w-[200px] bg-surface border-2 border-secondary py-[11px] px-3.5 text-[13px] text-secondary font-display font-bold tracking-[0.05em] uppercase outline-none focus:border-primary"
+      {/* Title + Description + tabs */}
+      <div className="fade-up flex flex-col gap-3 pb-5 border-b border-border-clr mb-6">
+        <div className="flex items-center gap-3 flex-wrap">
+          <input
+            type="text"
+            placeholder="JOB TITLE — e.g. Senior Backend Engineer"
+            value={jobTitle}
+            onChange={(e) => setJobTitle(e.target.value)}
+            className="flex-1 min-w-[200px] bg-surface border-2 border-secondary py-[11px] px-3.5 text-[13px] text-secondary font-display font-bold tracking-[0.05em] uppercase outline-none focus:border-primary"
+          />
+          {[
+            { k: "builder", l: "BUILDER" },
+            { k: "json", l: "{ } JSON" },
+          ].map((t) => (
+            <button
+              key={t.k}
+              onClick={() => setTab(t.k)}
+              className={[
+                "px-5 py-2.5 text-xs font-display font-extrabold tracking-[0.1em] cursor-pointer border-2 border-secondary transition-colors",
+                tab === t.k
+                  ? "bg-secondary text-white"
+                  : "bg-transparent text-secondary",
+              ].join(" ")}
+            >
+              {t.l}
+            </button>
+          ))}
+        </div>
+        <textarea
+          placeholder="JOB DESCRIPTION — Describe the role, responsibilities, requirements…"
+          value={jobDescription}
+          onChange={(e) => setJobDescription(e.target.value)}
+          rows={3}
+          className="w-full bg-surface border-2 border-secondary py-[11px] px-3.5 text-[13px] text-secondary font-body outline-none focus:border-primary resize-y min-h-[70px]"
         />
-        {[
-          { k: "builder", l: "BUILDER" },
-          { k: "json", l: "{ } JSON" },
-        ].map((t) => (
-          <button
-            key={t.k}
-            onClick={() => setTab(t.k)}
-            className={[
-              "px-5 py-2.5 text-xs font-display font-extrabold tracking-[0.1em] cursor-pointer border-2 border-secondary transition-colors",
-              tab === t.k
-                ? "bg-secondary text-white"
-                : "bg-transparent text-secondary",
-            ].join(" ")}
-          >
-            {t.l}
-          </button>
-        ))}
       </div>
 
       {/* Drag hint */}
