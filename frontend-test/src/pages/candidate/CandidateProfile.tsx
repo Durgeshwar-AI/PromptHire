@@ -133,6 +133,16 @@ export function CandidateProfile() {
     setSaving(true);
     setSaveMsg(null);
     try {
+      // 1. Upload resume if a new file was selected
+      if (resumeFile) {
+        const uploadRes = await candidateApi.uploadResume(resumeFile);
+        // Update local profile state with new URL immediately
+        setProfile((prev) => prev ? { ...prev, resumeUrl: uploadRes.resumeUrl } : prev);
+        setResumeFile(null);
+        if (resumeRef.current) resumeRef.current.value = "";
+      }
+
+      // 2. Save text fields
       const updated = await candidateApi.updateProfile({
         name: editName.trim() || undefined,
         phone: editPhone.trim(),

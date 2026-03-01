@@ -1,6 +1,8 @@
-import { v2 as cloudinary } from "cloudinary";
+import cloudinaryModule from "cloudinary";
 import cloudinaryStorage from "multer-storage-cloudinary";
 import multer from "multer";
+
+const cloudinary = cloudinaryModule.v2;
 
 // Lazy config — reads env vars on first use, safe against ESM import hoisting.
 function ensureConfig() {
@@ -31,16 +33,16 @@ let _multer = null;
 function getUpload() {
   if (!_multer) {
     ensureConfig();
+    // multer-storage-cloudinary v2 uses top-level options (not params)
     const storage = cloudinaryStorage({
-      cloudinary,
-      params: {
-        folder: "resumes",
-        resource_type: "raw",
-        public_id: (req, file) => {
-          const timestamp = Date.now();
-          const name = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_");
-          return `${name}_${timestamp}`;
-        },
+      cloudinary: cloudinaryModule,
+      folder: "resumes",
+      allowedFormats: ["pdf", "docx"],
+      resource_type: "raw",
+      filename: (req, file, cb) => {
+        const timestamp = Date.now();
+        const name = file.originalname.replace(/\.[^/.]+$/, "").replace(/\s+/g, "_");
+        cb(undefined, `${name}_${timestamp}`);
       },
     });
     _multer = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });

@@ -1,5 +1,6 @@
 import express from "express";
 import { authenticateCandidate } from "../../middleware/auth.js";
+import { upload } from "../../config/cloudinary.js";
 import Candidate from "../../models/Candidate.model.js";
 import JobRole from "../../models/JobRole.model.js";
 import InterviewProgress from "../../models/InterviewProgress.model.js";
@@ -103,6 +104,43 @@ router.put("/me", authenticateCandidate, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ─── Upload / replace resume ─────────────────────────────────────
+router.post(
+  "/me/resume",
+  authenticateCandidate,
+  (req, res, next) => {
+    upload.single("resume")(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Resume file is required" });
+      }
+
+      const candidate = await Candidate.findByIdAndUpdate(
+        req.candidate.id,
+        { $set: { resumeUrl: req.file.path } },
+        { new: true }
+      );
+
+      if (!candidate) {
+        return res.status(404).json({ error: "Candidate not found" });
+      }
+
+      res.json({
+        resumeUrl: candidate.resumeUrl,
+        message: "Resume uploaded successfully",
+      });
+    } catch (err) {
+      console.error("Resume upload error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
 
 // ─── Get my application progress for a job ───────────────────────
 router.get(

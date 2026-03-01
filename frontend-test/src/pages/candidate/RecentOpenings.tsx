@@ -51,6 +51,19 @@ export function RecentOpenings() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [hasResume, setHasResume] = useState(true); // optimistic default
+
+  /* Check if candidate has uploaded a resume */
+  useEffect(() => {
+    (async () => {
+      try {
+        const me = await candidateApi.me();
+        setHasResume(!!me.resumeUrl);
+      } catch {
+        // If profile fetch fails, allow apply (backend will catch it)
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,8 +225,17 @@ export function RecentOpenings() {
                 ? (STAGE_ROUTE_MAP[firstStage] || "/round/resume-screening")
                 : "/round/resume-screening";
               const applyUrl = `${firstStagePath}?jobId=${job.id}&jobTitle=${encodeURIComponent(job.title)}`;
+              const handleApply = (e?: React.MouseEvent) => {
+                e?.stopPropagation();
+                if (!hasResume) {
+                  alert("Please upload your resume on your profile before applying to jobs.");
+                  navigate("/candidate-profile");
+                  return;
+                }
+                navigate(applyUrl);
+              };
               return (
-                <Card key={job.id} hover onClick={() => navigate(applyUrl)}>
+                <Card key={job.id} hover onClick={() => handleApply()}>
                   <div className="px-5 py-[18px]">
                     {/* Company & posted */}
                     <div className="flex items-start justify-between mb-3">
@@ -271,9 +293,9 @@ export function RecentOpenings() {
                       <Btn
                         fullWidth
                         size="sm"
-                        onClick={(e: React.MouseEvent) => { e.stopPropagation(); navigate(applyUrl); }}
+                        onClick={(e: React.MouseEvent) => handleApply(e)}
                       >
-                        Apply Now →
+                        {hasResume ? "Apply Now →" : "Upload Resume to Apply"}
                       </Btn>
                     </div>
                   </div>
