@@ -122,7 +122,6 @@ export function InterviewPage() {
       const {
         signedUrl,
         systemPrompt,
-        firstMessage,
         candidateName,
         jobTitle,
         questions,
@@ -300,7 +299,7 @@ export function InterviewPage() {
       setConnecting(false);
       setError(err instanceof Error ? err.message : "Failed to start session");
     }
-  }, [jobId, safeEndSession]);
+  }, [jobId]);
 
   useEffect(() => {
     startConversation();
@@ -309,7 +308,7 @@ export function InterviewPage() {
       safeEndSession();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [safeEndSession]);
 
   /* Mute / unmute — guard against calling on closed session */
   useEffect(() => {

@@ -41,7 +41,7 @@ export function ResumeScreeningRound() {
     if (jobId) {
       (async () => {
         try {
-          const jobData: any = await jobsApi.get(jobId);
+          const jobData = await jobsApi.get(jobId);
           setJobDescription(jobData.description || "");
         } catch (err) {
           console.warn("[Job Fetch] Could not fetch job:", err);
@@ -87,7 +87,7 @@ export function ResumeScreeningRound() {
           setPhase("analysing");
           (async () => {
             try {
-              const data: any = await resumeApi.screenExisting(candidateId, {
+              const data = await resumeApi.screenExisting(candidateId, {
                 jobTitle,
                 jobDescription,
                 jobId,
@@ -135,7 +135,7 @@ export function ResumeScreeningRound() {
       }, 2200);
       return () => clearTimeout(t);
     }
-  }, [phase, useApi, candidateId, jobTitle]);
+  }, [phase, useApi, candidateId, jobTitle, jobDescription, jobId]);
 
   /* ── progress bar helper ── */
   const progressPct =

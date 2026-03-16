@@ -103,13 +103,24 @@ export const authApi = {
     }>("/auth/hr/me"),
 };
 
+/* ─── Job Type Definitions ─────────────────────────────────────── */
+
+export interface Job {
+  _id: string;
+  title: string;
+  description: string;
+  skills: string[];
+  company: string;
+  [key: string]: unknown;
+}
+
 /* ─── Jobs ─────────────────────────────────────────────────────── */
 
 export const jobsApi = {
   list: (status?: string) =>
     request(`/jobs${status ? `?status=${status}` : ""}`),
 
-  get: (id: string) => request(`/jobs/${id}/public`),
+  get: (id: string) => request<Job>(`/jobs/${id}/public`),
 
   create: (data: JobMutationPayload) =>
     request("/jobs", { method: "POST", body: JSON.stringify(data) }),
@@ -131,15 +142,28 @@ export const jobsApi = {
 
 /* ─── Resume / Screening ──────────────────────────────────────── */
 
+export interface ScreeningResult {
+  score?: number;
+  overallScore?: number;
+  summary?: string;
+  analysis?: string;
+  strengths?: string[];
+  pros?: string[];
+  weaknesses?: string[];
+  cons?: string[];
+  screening?: ScreeningResult;
+  [key: string]: unknown;
+}
+
 export const resumeApi = {
   submitAndScreen: (form: FormData) =>
-    upload("/candidates/submit-and-screen", form),
+    upload<ScreeningResult>("/candidates/submit-and-screen", form),
 
   screenExisting: (
     candidateId: string,
     data: { jobTitle: string; jobDescription: string; jobId?: string },
   ) =>
-    request(`/candidates/${candidateId}/screen`, {
+    request<ScreeningResult>(`/candidates/${candidateId}/screen`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
