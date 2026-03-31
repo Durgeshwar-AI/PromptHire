@@ -7,7 +7,7 @@
 
 import Interview from "../models/Interview.model.js";
 import Question from "../models/Question.model.js";
-import { callGeminiStandard } from "../services/geminiService.js";
+import { callGeminiStandard, parseGeminiJson } from "../services/geminiService.js";
 import { buildEvaluatorPrompt } from "../services/promptTemplates.js";
 
 /**
@@ -24,33 +24,62 @@ export async function processEvaluation(interviewId) {
     throw new Error(`No transcript for interview: ${interviewId}`);
   }
 
-  const questions = await Question.find({ jobId: interview.jobId }).sort(
-    "stepNumber"
-  );
-
-  const prompt = buildEvaluatorPrompt(
-    interview.transcript,
-    questions,
-    interview.hintsUsed || []
-  );
-
-  const result = await callGeminiStandard(prompt);
-  const scores = JSON.parse(result);
+  const jobId = interview.jobId?._id || interview.jobId;
 
   await Interview.findByIdAndUpdate(interviewId, {
-    overallScore: scores.overall_score,
-    technicalAccuracy: scores.technicalAccuracy,
-    communicationScore: scores.communicationScore,
-    hintRelianceScore: scores.hintRelianceScore,
-    questionBreakdown: scores.questionBreakdown,
-    strengths: scores.strengths,
-    weaknesses: scores.weaknesses,
-    status: "Evaluated",
-    evaluatedAt: new Date(),
+    status: "Evaluating",
+    evaluationError: null,
   });
 
-  console.log(
-    `Interview ${interviewId} evaluated — score: ${scores.overall_score}`
-  );
-  return scores;
+  try {
+    const questions = await Question.find({ jobId }).sort({ stepNumber: 1 });
+
+    const prompt = buildEvaluatorPrompt(
+      interview.transcript,
+      questions,
+      interview.hintsUsed || []
+    );
+
+    const result = await callGeminiStandard(prompt);
+    const scores = parseGeminiJson(result);
+
+    const normalizedScores = {
+      overallScore: Number(scores.overall_score ?? scores.overallScore ?? 0),
+      technicalAccuracy: Number(
+        scores.technicalAccuracy ?? scores.technical_accuracy ?? 0
+      ),
+      communicationScore: Number(
+        scores.communicationScore ?? scores.communication_score ?? 0
+      ),
+      hintRelianceScore: Number(
+        scores.hintRelianceScore ?? scores.hint_reliance_score ?? 0
+      ),
+      questionBreakdown: Array.isArray(scores.questionBreakdown)
+        ? scores.questionBreakdown
+        : [],
+      strengths: Array.isArray(scores.strengths) ? scores.strengths : [],
+      weaknesses: Array.isArray(scores.weaknesses) ? scores.weaknesses : [],
+    };
+
+    await Interview.findByIdAndUpdate(interviewId, {
+      ...normalizedScores,
+      evaluationSource: "Gemini",
+      status: "Evaluated",
+      evaluationError: null,
+      evaluatedAt: new Date(),
+    });
+
+    console.log(
+      `Interview ${interviewId} evaluated by Gemini — score: ${normalizedScores.overallScore}`
+    );
+    return normalizedScores;
+  } catch (error) {
+    await Interview.findByIdAndUpdate(interviewId, {
+      status: "EvaluationFailed",
+      evaluationError: error.message,
+      evaluatedAt: new Date(),
+    }).catch(() => {});
+
+    throw error;
+  }
 }

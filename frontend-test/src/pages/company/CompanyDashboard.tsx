@@ -231,8 +231,16 @@ export function CompanyDashboard() {
       const interviews = (await interviewsApi.getByJob(String(activeJobId))) as BackendInterview[];
       const ranked = Array.isArray(interviews)
         ? interviews
-            .filter((iv) => iv.status === "Evaluated" || typeof iv.overallScore === "number")
-            .sort((a, b) => (b.overallScore || 0) - (a.overallScore || 0))
+            .sort((a, b) => {
+              const aEvaluated = a.status === "Evaluated" ? 1 : 0;
+              const bEvaluated = b.status === "Evaluated" ? 1 : 0;
+
+              if (aEvaluated !== bEvaluated) {
+                return bEvaluated - aEvaluated;
+              }
+
+              return (b.overallScore || 0) - (a.overallScore || 0);
+            })
             .slice(0, 5)
             .map((iv, index) => {
               const candidateRecord = typeof iv.candidateId === "object" ? iv.candidateId : null;
@@ -249,7 +257,7 @@ export function CompanyDashboard() {
                 name: candidateName,
                 score: iv.overallScore ?? 0,
                 status: iv.status || "in_progress",
-                round: iv.currentRound || "AI Voice Interview",
+                round: iv.currentRound || (iv.status === "Evaluated" ? "AI Voice Interview" : "Waiting for evaluation"),
                 avatar: avatar || "CN",
                 skills: iv.skills || [],
                 appliedDate: iv.createdAt ? new Date(iv.createdAt).toLocaleDateString() : "",
@@ -349,7 +357,7 @@ export function CompanyDashboard() {
             <Card>
               {topCandidates.length === 0 ? (
                 <div className="px-4 py-6 text-center text-ink-faint text-sm">
-                  No evaluated candidates yet. This will update automatically after an interview completes.
+                  No interview participants yet. This will update automatically after candidates start applying.
                 </div>
               ) : (
                 topCandidates.map((candidate, index) => (
@@ -367,8 +375,11 @@ export function CompanyDashboard() {
                       <div className="font-display font-extrabold text-sm uppercase text-secondary">
                         {candidate.name}
                       </div>
-                      <div className="text-[11px] text-ink-faint font-body truncate">
-                        {candidate.round}
+                      <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                        <span className="text-[11px] text-ink-faint font-body truncate">
+                          {candidate.round}
+                        </span>
+                        <StatusPill status={candidate.status} />
                       </div>
                     </div>
                     <div className="font-display font-black text-lg text-secondary">

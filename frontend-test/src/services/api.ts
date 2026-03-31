@@ -422,6 +422,8 @@ export const candidateApi = {
       technicalAccuracy?: number;
       communicationScore?: number;
       hintRelianceScore?: number;
+      evaluationError?: string;
+      evaluationSource?: string;
       questionBreakdown?: Array<{
         stepNumber?: number;
         questionText?: string;
