@@ -3,7 +3,7 @@
    error handling are in one place.
    ──────────────────────────────────────────────────────────────── */
 
-const BASE = "/api"; // proxied by Vite → http://localhost:5000/api
+const BASE = (import.meta.env.VITE_API_BASE as string) || "/api"; // proxied by Vite in dev, or set in production via VITE_API_BASE
 
 type ErrorBody = { error?: string };
 type JobMutationPayload = Record<string, unknown>;
@@ -379,7 +379,14 @@ export interface CandidateMe {
   skills: string[];
   resumeUrl: string;
   resumeSummary: string | null;
-  appliedJobs: { _id: string; title: string; description?: string; skills?: string[]; status?: string; totalRounds?: number }[];
+  appliedJobs: {
+    _id: string;
+    title: string;
+    description?: string;
+    skills?: string[];
+    status?: string;
+    totalRounds?: number;
+  }[];
   createdAt: string;
 }
 
@@ -401,7 +408,10 @@ export const candidateApi = {
   uploadResume: (file: File) => {
     const form = new FormData();
     form.append("resume", file);
-    return upload<{ resumeUrl: string; message: string }>("/candidate/me/resume", form);
+    return upload<{ resumeUrl: string; message: string }>(
+      "/candidate/me/resume",
+      form,
+    );
   },
 
   /** Get all my applications with progress */
