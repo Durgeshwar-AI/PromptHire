@@ -32,6 +32,8 @@ const InterviewSchema = new mongoose.Schema(
     technicalAccuracy: { type: Number, min: 0, max: 10 },
     communicationScore: { type: Number, min: 0, max: 10 },
     hintRelianceScore: { type: Number, min: 0, max: 10 },
+    evaluationSource: { type: String, default: null },
+    evaluationError: { type: String, default: null },
 
     questionBreakdown: [
       {
@@ -51,7 +53,15 @@ const InterviewSchema = new mongoose.Schema(
     // ── Status ─────────────────────────────────────
     status: {
       type: String,
-      enum: ["Scheduled", "InProgress", "Completed", "Evaluated", "Ranked"],
+      enum: [
+        "Scheduled",
+        "InProgress",
+        "Completed",
+        "Evaluating",
+        "Evaluated",
+        "EvaluationFailed",
+        "Ranked",
+      ],
       default: "Scheduled",
     },
 

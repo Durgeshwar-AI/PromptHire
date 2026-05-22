@@ -40,3 +40,25 @@ export async function callGeminiStandard(prompt) {
 
   return text;
 }
+
+export function parseGeminiJson(text) {
+  if (typeof text !== "string") {
+    throw new Error("Gemini response is not a string");
+  }
+
+  const cleaned = text
+    .replace(/```json\s*/gi, "")
+    .replace(/```/g, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+
+    throw new Error("Gemini returned invalid JSON");
+  }
+}

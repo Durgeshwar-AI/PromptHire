@@ -4,7 +4,7 @@ import { authenticateHR, authenticateCandidate } from "../../middleware/auth.js"
 import Interview from "../../models/Interview.model.js";
 import JobRole from "../../models/JobRole.model.js";
 import InterviewProgress from "../../models/InterviewProgress.model.js";
-import { callGeminiStandard } from "../../services/geminiService.js";
+import { callGeminiStandard, parseGeminiJson } from "../../services/geminiService.js";
 import { processFailedCandidates } from "../../services/pipelineScheduler.service.js";
 import { buildRankingPrompt } from "../../services/promptTemplates.js";
 import { sendAssessmentLinkEmail } from "../../services/mail.services.js";
@@ -27,7 +27,7 @@ router.get("/result/:interviewId", authenticateCandidate, async (req, res) => {
       candidateId, // ← ensures candidate can only see their own interview
     }).select(
       "status overallScore technicalAccuracy communicationScore hintRelianceScore " +
-      "questionBreakdown strengths weaknesses completedAt evaluatedAt"
+      "questionBreakdown strengths weaknesses completedAt evaluatedAt evaluationError evaluationSource"
     );
  
     if (!interview) {
@@ -111,7 +111,7 @@ router.get("/job/:jobId/leaderboard", authenticateHR, async (req, res) => {
 
     const prompt = buildRankingPrompt(interviews, jobRole);
     const result = await callGeminiStandard(prompt);
-    const ranking = JSON.parse(result);
+    const ranking = parseGeminiJson(result);
 
     res.json({ ranking, raw: interviews });
   } catch (err) {

@@ -568,6 +568,8 @@ function ReportView({ interviewId }: { interviewId: string }) {
     technicalAccuracy?: number;
     communicationScore?: number;
     hintRelianceScore?: number;
+    evaluationError?: string;
+    evaluationSource?: string;
     questionBreakdown?: Array<{
       stepNumber?: number;
       questionText?: string;
@@ -594,11 +596,40 @@ function ReportView({ interviewId }: { interviewId: string }) {
 
     const loadResult = async () => {
       try {
-        const data = await candidateApi.interviewResult(interviewId);
+        const data = (await candidateApi.interviewResult(interviewId)) as {
+          status: string;
+          overallScore?: number;
+          technicalAccuracy?: number;
+          communicationScore?: number;
+          hintRelianceScore?: number;
+          evaluationError?: string;
+          evaluationSource?: string;
+          questionBreakdown?: Array<{
+            stepNumber?: number;
+            questionText?: string;
+            level?: string;
+            candidateAnswerSummary?: string;
+            score?: number;
+            hintWasUsed?: boolean;
+            keyConceptsCovered?: string[];
+          }>;
+          strengths?: string[];
+          weaknesses?: string[];
+          completedAt?: string;
+          evaluatedAt?: string;
+        };
         if (cancelled) return;
         setResult(data);
 
         if (data.status !== "Evaluated") {
+          if (data.status === "EvaluationFailed") {
+            const failureMessage = (data as { evaluationError?: string }).evaluationError;
+            setErrorMessage(
+              failureMessage || "Interview evaluation failed. Please review the backend logs."
+            );
+            return;
+          }
+
           timer = window.setTimeout(() => {
             void loadResult();
           }, 4000);
@@ -620,6 +651,7 @@ function ReportView({ interviewId }: { interviewId: string }) {
 
   const loading = Boolean(interviewId) && (!result || result.status !== "Evaluated") && !errorMessage;
   const fetchError = !interviewId ? "Interview ID is missing." : errorMessage;
+  const evaluationLabel = result?.evaluationSource ? `Evaluated by ${result.evaluationSource}` : "Evaluation complete";
 
   const scoreCards = result?.questionBreakdown?.length
     ? result.questionBreakdown.map((item) => ({
@@ -668,7 +700,7 @@ function ReportView({ interviewId }: { interviewId: string }) {
                 Overall Score
               </div>
               <div className="font-body text-[11px] text-white/50 mt-1">
-                {loading ? "Evaluating now" : "Evaluation complete"}
+                {loading ? "Evaluating now" : evaluationLabel}
               </div>
             </div>
           </div>

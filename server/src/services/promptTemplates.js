@@ -20,7 +20,7 @@ export function buildEvaluatorPrompt(transcript, questions, hintsUsed = []) {
 
   const hintsJson = JSON.stringify(hintsUsed, null, 2);
 
-  return `ROLE: You are a Senior Technical Hiring Manager evaluating a recorded interview.
+  return `ROLE: You are a Senior HR Hiring Manager evaluating a recorded interview.
 
 TRANSCRIPT:
 ${transcript}
@@ -32,10 +32,11 @@ HINTS USED BY CANDIDATE:
 ${hintsJson}
 
 EVALUATION CRITERIA:
-1. Technical Depth — Are answers accurate given the question's difficulty level?
-2. Hint Reliance — Penalise Hard questions where hints were used. Reward unprompted correct answers.
+1. Role Fit — Does the candidate sound ready for the role and company?
+2. Motivation — Do their answers show genuine interest and clear goals?
 3. Communication — Rate clarity, structure, and articulation.
-4. Concept Coverage — Cross-reference answer summaries against keyConceptsExpected per question.
+4. Answer Quality — Cross-reference answer summaries against keyConceptsExpected per question.
+5. Hint Reliance — Penalise questions where hints were used. Reward strong independent answers.
 
 RESPOND ONLY WITH VALID JSON. No explanation text. No markdown fences. No preamble.
 
